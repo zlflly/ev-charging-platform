@@ -23,6 +23,10 @@ struct OrderInfo
     int chargerType = 0;
     qint64 stationId = 0;
     QString stationName;
+    QString stationRegion;
+    QString stationAddress;
+    double latitude = 0.0;
+    double longitude = 0.0;
     double pricePerKwh = 0.0;
     double powerKw = 0.0;
     qint64 createTimeMs = 0;
@@ -32,6 +36,8 @@ struct OrderInfo
     double energyKwh = 0.0;
     // 目标充电量/电池容量（服务端若提供，用于把实际电量映射为进度）。
     double targetEnergyKwh = 0.0;
+    // 服务端可直接返回 0~100 的真实进度；缺失时由电量/展示容量计算。
+    double progressPercent = -1.0;
     double estimatedAmount = 0.0;
     double amount = 0.0;
     double electricityFee = 0.0;
@@ -72,6 +78,10 @@ struct OrderInfo
         order.stationId = static_cast<qint64>(
             json.value(QStringLiteral("stationId")).toDouble());
         order.stationName = json.value(QStringLiteral("stationName")).toString();
+        order.stationRegion = json.value(QStringLiteral("stationRegion")).toString();
+        order.stationAddress = json.value(QStringLiteral("address")).toString();
+        order.latitude = json.value(QStringLiteral("latitude")).toDouble();
+        order.longitude = json.value(QStringLiteral("longitude")).toDouble();
         order.pricePerKwh = json.value(QStringLiteral("pricePerKwh")).toDouble();
         order.powerKw = json.value(QStringLiteral("powerKw")).toDouble();
         order.createTimeMs = static_cast<qint64>(
@@ -89,6 +99,10 @@ struct OrderInfo
         }
         if (order.targetEnergyKwh <= 0.0) {
             order.targetEnergyKwh = json.value(QStringLiteral("targetKwh")).toDouble();
+        }
+        order.progressPercent = json.value(QStringLiteral("progressPercent")).toDouble(-1.0);
+        if (order.progressPercent < 0.0) {
+            order.progressPercent = json.value(QStringLiteral("progress")).toDouble(-1.0);
         }
         order.estimatedAmount = json.value(QStringLiteral("estimatedAmount")).toDouble();
         order.amount = json.value(QStringLiteral("amount")).toDouble();

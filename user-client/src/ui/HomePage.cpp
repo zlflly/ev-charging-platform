@@ -11,12 +11,14 @@
 #include <QFile>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QIcon>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <QScrollArea>
 #include <QShowEvent>
 #include <QSizePolicy>
 #include <QTimer>
@@ -41,6 +43,19 @@ QString cssRgba(const QColor& color, int alpha)
 {
     return QStringLiteral("rgba(%1,%2,%3,%4)")
         .arg(color.red()).arg(color.green()).arg(color.blue()).arg(alpha);
+}
+
+QPixmap tintedSvgPixmap(const QString& resourcePath, const QSize& size,
+                        const QColor& color)
+{
+    const QPixmap source = QIcon(resourcePath).pixmap(size);
+    if (source.isNull()) return {};
+    QPixmap tinted(size);
+    tinted.fill(color);
+    QPainter painter(&tinted);
+    painter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+    painter.drawPixmap(0, 0, source);
+    return tinted;
 }
 
 QString readEnvironmentValue(const char* variableName)
@@ -74,10 +89,12 @@ protected:
 
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setPen(QPen(theme::textSecondary(), 2));
-        painter.setBrush(Qt::NoBrush);
-        painter.drawEllipse(QRectF(17, 10, 12, 12));
-        painter.drawLine(QPointF(27, 21), QPointF(33, 27));
+        const QPixmap searchIcon = tintedSvgPixmap(
+            QStringLiteral(":/resources/icons/search.svg"), QSize(26, 26),
+            theme::textSecondary());
+        if (!searchIcon.isNull()) {
+            painter.drawPixmap(10, (height() - searchIcon.height()) / 2, searchIcon);
+        }
     }
 };
 
@@ -101,12 +118,14 @@ protected:
         painter.setPen(QPen(theme::textPrimary(), 1.5));
         painter.setBrush(background);
         painter.drawEllipse(rect().adjusted(1, 1, -1, -1));
-        painter.setPen(QPen(theme::textPrimary(), 2));
-        painter.drawEllipse(QPointF(width() / 2.0, height() / 2.0), 7, 7);
-        painter.drawLine(QPointF(width() / 2.0, 6),
-                         QPointF(width() / 2.0, height() - 6));
-        painter.drawLine(QPointF(6, height() / 2.0),
-                         QPointF(width() - 6, height() / 2.0));
+        const QPixmap locateIcon = tintedSvgPixmap(
+            QStringLiteral(":/resources/icons/locate.svg"), QSize(28, 28),
+            theme::textPrimary());
+        if (!locateIcon.isNull()) {
+            painter.drawPixmap((width() - locateIcon.width()) / 2,
+                               (height() - locateIcon.height()) / 2,
+                               locateIcon);
+        }
     }
 };
 
@@ -128,53 +147,17 @@ protected:
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing, true);
         const QColor color = selected_ ? theme::primaryBlue() : theme::textSecondary();
-        painter.setPen(QPen(color, 2.1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.setBrush(Qt::NoBrush);
-        const QPointF c(width() / 2.0, 18);
-
-        if (kind_ == Kind::Home) {
-            QPainterPath home;
-            home.moveTo(c.x() - 11, 17);
-            home.lineTo(c.x(), 8);
-            home.lineTo(c.x() + 11, 17);
-            home.lineTo(c.x() + 9, 17);
-            home.lineTo(c.x() + 9, 28);
-            home.lineTo(c.x() - 9, 28);
-            home.lineTo(c.x() - 9, 17);
-            home.closeSubpath();
-            painter.setBrush(color);
-            painter.drawPath(home);
-        } else if (kind_ == Kind::Station) {
-            painter.drawEllipse(QPointF(c.x(), 15), 9, 9);
-            QPainterPath pin;
-            pin.moveTo(c.x(), 31);
-            pin.cubicTo(c.x() - 2, 28, c.x() - 6, 23, c.x() - 6, 19);
-            pin.cubicTo(c.x() - 6, 14, c.x() - 3, 11, c.x(), 11);
-            pin.cubicTo(c.x() + 3, 11, c.x() + 6, 14, c.x() + 6, 19);
-            pin.cubicTo(c.x() + 6, 23, c.x() + 2, 28, c.x(), 31);
-            painter.drawPath(pin);
-            painter.drawLine(QPointF(c.x() - 10, 31), QPointF(c.x() + 10, 31));
-        } else if (kind_ == Kind::Charge) {
-            painter.drawEllipse(c, 11, 11);
-            QPainterPath bolt;
-            bolt.moveTo(c.x() + 2, 7);
-            bolt.lineTo(c.x() - 4, 19);
-            bolt.lineTo(c.x(), 19);
-            bolt.lineTo(c.x() - 2, 29);
-            bolt.lineTo(c.x() + 6, 16);
-            bolt.lineTo(c.x() + 2, 16);
-            bolt.closeSubpath();
-            painter.setBrush(color);
-            painter.drawPath(bolt);
-        } else if (kind_ == Kind::Order) {
-            painter.drawRoundedRect(QRectF(c.x() - 11, 8, 20, 22), 2, 2);
-            painter.drawLine(QPointF(c.x() - 6, 15), QPointF(c.x() + 4, 15));
-            painter.drawLine(QPointF(c.x() - 6, 20), QPointF(c.x() + 4, 20));
-            painter.drawLine(QPointF(c.x() - 6, 25), QPointF(c.x() + 1, 25));
-            painter.drawLine(QPointF(c.x() + 7, 24), QPointF(c.x() + 12, 29));
-        } else {
-            painter.drawEllipse(QPointF(c.x(), 12), 6, 6);
-            painter.drawArc(QRectF(c.x() - 11, 21, 22, 18), 20 * 16, 140 * 16);
+        QString iconPath;
+        switch (kind_) {
+        case Kind::Home: iconPath = QStringLiteral(":/resources/icons/home.svg"); break;
+        case Kind::Station: iconPath = QStringLiteral(":/resources/icons/station.svg"); break;
+        case Kind::Charge: iconPath = QStringLiteral(":/resources/icons/charge.svg"); break;
+        case Kind::Order: iconPath = QStringLiteral(":/resources/icons/order.svg"); break;
+        case Kind::Profile: iconPath = QStringLiteral(":/resources/icons/profile.svg"); break;
+        }
+        const QPixmap icon = tintedSvgPixmap(iconPath, QSize(27, 27), color);
+        if (!icon.isNull()) {
+            painter.drawPixmap((width() - icon.width()) / 2, 3, icon);
         }
 
         QFont font(QStringLiteral("Microsoft YaHei UI"));
@@ -278,6 +261,18 @@ void HomePage::buildUi()
     recenterButton_->setAccessibleName(QStringLiteral("回到当前位置"));
     recenterButton_->raise();
 
+    stationScroll_ = new QScrollArea(this);
+    stationScroll_->setObjectName(QStringLiteral("StationScroll"));
+    stationScroll_->setFrameShape(QFrame::NoFrame);
+    stationScroll_->setWidgetResizable(false);
+    stationScroll_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    stationScroll_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    stationScroll_->setStyleSheet(QStringLiteral(
+        "QScrollArea#StationScroll { background: transparent; border: none; }"));
+    stationContainer_ = new QWidget();
+    stationContainer_->setStyleSheet(QStringLiteral("background: transparent;"));
+    stationScroll_->setWidget(stationContainer_);
+
     for (const QString& text : {QStringLiteral("距离优先"),
                                 QStringLiteral("价格优先"),
                                 QStringLiteral("空闲优先")}) {
@@ -299,7 +294,7 @@ void HomePage::buildUi()
         "<span style='color:%1;'>登录即可使用 </span>"
         "<span style='color:%2;'>收藏（充电中）</span>"
         "<span style='color:%1;'> 和 </span>"
-        "<span style='color:%2;'>（电量监控）</span>"
+        "<span style='color:%2;'>电量监控</span>"
         "<span style='color:%1;'> 功能</span>")
         .arg(cssColor(theme::textSecondary()), cssColor(theme::primaryBlue())));
 
@@ -320,6 +315,16 @@ void HomePage::buildUi()
         navButtons_.append(new NavButton(item.first, item.second,
                                           navButtons_.isEmpty(), bottomBar_));
     }
+
+    // 底部栏是页面导航入口，不再是仅用于展示的静态图标。
+    connect(navButtons_[1], &QPushButton::clicked,
+            this, &HomePage::stationsRequested);
+    connect(navButtons_[2], &QPushButton::clicked,
+            this, &HomePage::chargingRequested);
+    connect(navButtons_[3], &QPushButton::clicked,
+            this, &HomePage::ordersRequested);
+    connect(navButtons_[4], &QPushButton::clicked,
+            this, &HomePage::profileRequested);
 
     Q_UNUSED(contentWidth);
 }
@@ -357,6 +362,10 @@ void HomePage::resizeEvent(QResizeEvent* event)
                                  qRound(40 * sx), qRound(40 * sy));
     recenterButton_->raise();
 
+    stationScroll_->setGeometry(margin, qRound(theme::homeCardsTop * sy),
+                                contentWidth,
+                                qRound((theme::homeFooterTop - theme::homeCardsTop - 4) * sy));
+
     const int sortGap = qRound(26 * sx);
     const int sortWidth = (contentWidth - sortGap * 2) / 3;
     for (int i = 0; i < sortButtons_.size(); ++i) {
@@ -383,7 +392,9 @@ void HomePage::resizeEvent(QResizeEvent* event)
 void HomePage::showEvent(QShowEvent* event)
 {
     QWidget::showEvent(event);
-    if (firstShowHandled_) {
+    if (firstShowHandled_ && !previewMode_) {
+        // 从订单/个人中心返回时刷新一次，保证站点空闲数来自服务端最新状态。
+        refreshStations();
         return;
     }
     firstShowHandled_ = true;
@@ -579,7 +590,7 @@ void HomePage::updateSortButtons()
 void HomePage::showLoadingState()
 {
     clearList();
-    auto* loading = new QLabel(QStringLiteral("加载附近站点中..."), this);
+    auto* loading = new QLabel(QStringLiteral("加载附近站点中..."), stationContainer_);
     loading->setProperty("homeState", true);
     loading->setAlignment(Qt::AlignCenter);
     loading->setStyleSheet(QStringLiteral(
@@ -593,7 +604,7 @@ void HomePage::showLoadingState()
 void HomePage::showErrorState(const QString& message)
 {
     clearList();
-    auto* state = new QFrame(this);
+    auto* state = new QFrame(stationContainer_);
     state->setObjectName(QStringLiteral("HomeState"));
     state->setProperty("homeState", true);
     state->setStyleSheet(QStringLiteral(
@@ -632,7 +643,7 @@ void HomePage::showErrorState(const QString& message)
 void HomePage::showEmptyState()
 {
     clearList();
-    auto* empty = new QLabel(QStringLiteral("暂无附近充电站\n请搜索其他地址后重试"), this);
+    auto* empty = new QLabel(QStringLiteral("暂无附近充电站\n请搜索其他地址后重试"), stationContainer_);
     empty->setProperty("homeState", true);
     empty->setAlignment(Qt::AlignCenter);
     empty->setStyleSheet(QStringLiteral(
@@ -647,7 +658,7 @@ void HomePage::renderStations()
 {
     clearList();
     for (const StationInfo& station : stations_) {
-        auto* card = new StationCard(station, this);
+        auto* card = new StationCard(station, stationContainer_);
         connect(card, &StationCard::selected,
                 this, &HomePage::stationSelected);
         stationItems_.append(card);
@@ -667,22 +678,23 @@ void HomePage::layoutStationItems()
     const qreal sy = static_cast<qreal>(height()) / theme::loginCanvasHeight;
     const int margin = qRound(17 * sx);
     const int contentWidth = width() - margin * 2;
+    const int viewportHeight = qMax(1, qRound((theme::homeFooterTop
+                                               - theme::homeCardsTop - 4) * sy));
+    const int itemHeight = qRound(theme::homeCardHeight * sy);
+    const int itemGap = qRound(theme::homeCardGap * sy);
+    const int containerHeight = qMax(viewportHeight,
+                                     stationItems_.size() * itemHeight +
+                                         qMax(0, stationItems_.size() - 1) * itemGap);
+    stationContainer_->resize(contentWidth, containerHeight);
     int cardIndex = 0;
 
     for (QWidget* item : stationItems_) {
         const bool stateWidget = item->property("homeState").toBool();
         if (stateWidget) {
-            const int stateTop = qRound(theme::homeCardsTop * sy);
-            const int stateHeight = qMax(qRound(theme::homeCardHeight * sy),
-                                        qRound((theme::homeFooterTop
-                                                - theme::homeCardsTop - 4) * sy));
-            item->setGeometry(margin, stateTop, contentWidth, stateHeight);
+            item->setGeometry(0, 0, contentWidth, viewportHeight);
         } else {
-            const int top = qRound((theme::homeCardsTop
-                                    + cardIndex * (theme::homeCardHeight
-                                                   + theme::homeCardGap)) * sy);
-            item->setGeometry(margin, top, contentWidth,
-                              qRound(theme::homeCardHeight * sy));
+            const int top = cardIndex * (itemHeight + itemGap);
+            item->setGeometry(0, top, contentWidth, itemHeight);
             ++cardIndex;
         }
         item->show();

@@ -287,6 +287,12 @@ CMakeFiles/user-client.dir/user-client_autogen/mocs_compilation.cpp.o: \
  /usr/include/c++/13/ratio /usr/include/c++/13/ctime \
  /usr/include/x86_64-linux-gnu/qt6/QtCore/QString \
  /usr/include/x86_64-linux-gnu/qt6/QtCore/qstring.h \
+ /mnt/d/User/Desktop/ev-charging/user-client/build/user-client_autogen/CG2SJ52CHU/moc_RoutePlanner.cpp \
+ /mnt/d/User/Desktop/ev-charging/user-client/build/user-client_autogen/CG2SJ52CHU/../../../src/geo/RoutePlanner.h \
+ /usr/include/x86_64-linux-gnu/qt6/QtCore/QList \
+ /usr/include/x86_64-linux-gnu/qt6/QtCore/qlist.h \
+ /usr/include/x86_64-linux-gnu/qt6/QtCore/QPointF \
+ /usr/include/x86_64-linux-gnu/qt6/QtCore/qpoint.h \
  /mnt/d/User/Desktop/ev-charging/user-client/build/user-client_autogen/7OIUYE7PDQ/moc_NetworkClient.cpp \
  /mnt/d/User/Desktop/ev-charging/user-client/build/user-client_autogen/7OIUYE7PDQ/../../../src/net/NetworkClient.h \
  /mnt/d/User/Desktop/ev-charging/user-client/src/protocol/Protocol.h \
@@ -345,8 +351,6 @@ CMakeFiles/user-client.dir/user-client_autogen/mocs_compilation.cpp.o: \
  /mnt/d/User/Desktop/ev-charging/user-client/src/model/Station.h \
  /usr/include/x86_64-linux-gnu/qt6/QtCore/QJsonArray \
  /usr/include/x86_64-linux-gnu/qt6/QtCore/qjsonarray.h \
- /usr/include/x86_64-linux-gnu/qt6/QtCore/QList \
- /usr/include/x86_64-linux-gnu/qt6/QtCore/qlist.h \
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QFrame \
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qframe.h \
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qtwidgetsglobal.h \
@@ -406,6 +410,12 @@ CMakeFiles/user-client.dir/user-client_autogen/mocs_compilation.cpp.o: \
  /usr/include/x86_64-linux-gnu/qt6/QtGui/qtextoption.h \
  /usr/include/x86_64-linux-gnu/qt6/QtGui/QPixmap \
  /usr/include/x86_64-linux-gnu/qt6/QtGui/qpixmap.h \
+ /mnt/d/User/Desktop/ev-charging/user-client/build/user-client_autogen/YPKJ5OE7LN/moc_NavigationPage.cpp \
+ /mnt/d/User/Desktop/ev-charging/user-client/build/user-client_autogen/YPKJ5OE7LN/../../../src/ui/NavigationPage.h \
+ /mnt/d/User/Desktop/ev-charging/user-client/build/user-client_autogen/YPKJ5OE7LN/moc_OrderPage.cpp \
+ /mnt/d/User/Desktop/ev-charging/user-client/build/user-client_autogen/YPKJ5OE7LN/../../../src/ui/OrderPage.h \
+ /mnt/d/User/Desktop/ev-charging/user-client/build/user-client_autogen/YPKJ5OE7LN/moc_ProfilePage.cpp \
+ /mnt/d/User/Desktop/ev-charging/user-client/build/user-client_autogen/YPKJ5OE7LN/../../../src/ui/ProfilePage.h \
  /mnt/d/User/Desktop/ev-charging/user-client/build/user-client_autogen/YPKJ5OE7LN/moc_SettlementPage.cpp \
  /mnt/d/User/Desktop/ev-charging/user-client/build/user-client_autogen/YPKJ5OE7LN/../../../src/ui/SettlementPage.h \
  /mnt/d/User/Desktop/ev-charging/user-client/build/user-client_autogen/YPKJ5OE7LN/moc_StationCard.cpp \

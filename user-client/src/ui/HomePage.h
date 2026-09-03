@@ -10,6 +10,7 @@ class QFrame;
 class QLabel;
 class QLineEdit;
 class QPushButton;
+class QScrollArea;
 class QWebEngineView;
 class NetworkClient;
 
@@ -27,6 +28,10 @@ public:
 
 signals:
     void stationSelected(qint64 stationId);
+    void stationsRequested();
+    void chargingRequested();
+    void ordersRequested();
+    void profileRequested();
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -64,12 +69,14 @@ private:
     QFrame* mapFrame_ = nullptr;
     QWebEngineView* mapView_ = nullptr;
     QPushButton* recenterButton_ = nullptr;
+    QScrollArea* stationScroll_ = nullptr;
+    QWidget* stationContainer_ = nullptr;
     QList<QPushButton*> sortButtons_;
     QList<QWidget*> stationItems_;
     QList<StationInfo> stations_;
     QLabel* footerLabel_ = nullptr;
     QFrame* bottomBar_ = nullptr;
-    QList<QWidget*> navButtons_;
+    QList<QPushButton*> navButtons_;
     int sortMode_ = 0;
     quint64 stationQueryVersion_ = 0;
     bool firstShowHandled_ = false;

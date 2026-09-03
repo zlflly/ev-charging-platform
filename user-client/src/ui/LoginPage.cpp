@@ -8,12 +8,14 @@
 #include <QFrame>
 #include <QGraphicsDropShadowEffect>
 #include <QHBoxLayout>
+#include <QIcon>
 #include <QJsonObject>
 #include <QLabel>
 #include <QPainter>
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QResizeEvent>
+#include <QSettings>
 #include <QTimer>
 #include <QVBoxLayout>
 
@@ -25,6 +27,19 @@ const QRegularExpression kPhonePattern(QStringLiteral("^1\\d{10}$"));
 QString cssColor(const QColor& color)
 {
     return color.name(QColor::HexRgb);
+}
+
+QPixmap tintedSvgPixmap(const QString& resourcePath, const QSize& size,
+                        const QColor& color)
+{
+    const QPixmap source = QIcon(resourcePath).pixmap(size);
+    if (source.isNull()) return {};
+    QPixmap tinted(size);
+    tinted.fill(color);
+    QPainter painter(&tinted);
+    painter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+    painter.drawPixmap(0, 0, source);
+    return tinted;
 }
 
 // 自绘手机 icon，避免使用 emoji 或平台私有图标导致视觉不一致。
@@ -41,6 +56,18 @@ protected:
     {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing, true);
+
+        const QPixmap icon = tintedSvgPixmap(
+            QStringLiteral(":/resources/icons/phone.svg"), QSize(25, 25),
+            theme::primaryBlue());
+        if (!icon.isNull()) {
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(theme::chipBg());
+            painter.drawEllipse(rect());
+            painter.drawPixmap((width() - icon.width()) / 2,
+                               (height() - icon.height()) / 2, icon);
+            return;
+        }
 
         painter.setPen(Qt::NoPen);
         painter.setBrush(theme::chipBg());
@@ -242,6 +269,7 @@ void LoginPage::onLoginClicked()
         showHint(QStringLiteral("请输入 1 开头的 11 位手机号"));
         return;
     }
+    restoringSession_ = false;
     hintLabel_->hide();
     awaitingLoginResponse_ = true;
     loginButton_->setEnabled(false);
@@ -258,23 +286,37 @@ void LoginPage::onLoginClicked()
 
 void LoginPage::onConnected()
 {
-    if (pendingPhone_.isEmpty()) {
+    if (!pendingPhone_.isEmpty()) {
+        const QString phone = pendingPhone_;
+        pendingPhone_.clear();
+        sendLoginRequest(phone);
         return;
     }
-    const QString phone = pendingPhone_;
-    pendingPhone_.clear();
-    sendLoginRequest(phone);
+
+    // 连接断开后 NetworkClient 会自动重连；重连成功时重新登录只读的
+    // Session 手机号，恢复服务端 TCP 会话，但不把用户带回登录页。
+    if (Session::instance().isLoggedIn() && !awaitingLoginResponse_) {
+        restoringSession_ = true;
+        awaitingLoginResponse_ = true;
+        loginButton_->setEnabled(false);
+        loginButton_->setText(QStringLiteral("恢复登录中..."));
+        sendLoginRequest(Session::instance().phone());
+    }
 }
 
 void LoginPage::onTransportError(int transportErrorCode,
                                  const QString& message)
 {
-    if (pendingPhone_.isEmpty()) {
+    if (pendingPhone_.isEmpty() && !restoringSession_) {
         return;
     }
     pendingPhone_.clear();
+    const bool wasRestoring = restoringSession_;
+    restoringSession_ = false;
     finishLoginAttempt();
-    showHint(protocol::describeError(transportErrorCode, message));
+    showHint(wasRestoring
+                 ? QStringLiteral("登录状态已失效，请重新登录")
+                 : protocol::describeError(transportErrorCode, message));
 }
 
 void LoginPage::sendLoginRequest(const QString& phone)
@@ -300,6 +342,8 @@ void LoginPage::finishLoginAttempt()
 void LoginPage::handleLoginResponse(int code, const QString& message,
                                     bool isNewUser, const QJsonObject& userData)
 {
+    const bool wasRestoring = restoringSession_;
+    restoringSession_ = false;
     if (code != protocol::CodeOk) {
         showHint(protocol::describeError(code, message));
         return;
@@ -310,15 +354,69 @@ void LoginPage::handleLoginResponse(int code, const QString& message,
         showHint(QStringLiteral("登录响应异常（用户信息缺失），请稍后重试。"));
         return;
     }
+    const QString status = userData.value(QStringLiteral("status")).toString();
+    if (!status.isEmpty() && status != QStringLiteral("ACTIVE")) {
+        showHint(QStringLiteral("该账号当前不可用，请联系客服处理。"));
+        return;
+    }
+    const QString phone = userData.value(QStringLiteral("phone")).toString().isEmpty()
+        ? phoneEdit_->text().trimmed()
+        : userData.value(QStringLiteral("phone")).toString();
     Session::instance().setUser(
         userId,
-        userData.value(QStringLiteral("phone")).toString(),
+        phone,
         userData.value(QStringLiteral("nickname")).toString(),
         userData.value(QStringLiteral("avatarUrl")).toString(),
         userData.value(QStringLiteral("balance")).toDouble(),
         userData.value(QStringLiteral("status")).toString());
+
+    QSettings settings;
+    settings.setValue(QStringLiteral("auth/phone"), phone);
+    settings.setValue(QStringLiteral("auth/remember"), true);
     Q_UNUSED(isNewUser);
-    emit loginSucceeded();
+    if (wasRestoring) {
+        emit sessionRestored();
+    } else {
+        emit loginSucceeded();
+    }
+}
+
+void LoginPage::tryRestoreLogin()
+{
+    if (!networkClient_ || Session::instance().isLoggedIn()) {
+        return;
+    }
+    QSettings settings;
+    if (!settings.value(QStringLiteral("auth/remember"), false).toBool()) {
+        return;
+    }
+    const QString phone = settings.value(QStringLiteral("auth/phone")).toString().trimmed();
+    if (!kPhonePattern.match(phone).hasMatch()) {
+        clearRememberedLogin();
+        return;
+    }
+    phoneEdit_->setText(phone);
+    hintLabel_->hide();
+    restoringSession_ = true;
+    awaitingLoginResponse_ = true;
+    loginButton_->setEnabled(false);
+    loginButton_->setText(QStringLiteral("恢复登录中..."));
+    if (networkClient_->isConnected()) {
+        sendLoginRequest(phone);
+    } else {
+        pendingPhone_ = phone;
+        networkClient_->connectToServer(
+            QString::fromUtf8(protocol::kDefaultHost), protocol::kDefaultPort);
+    }
+}
+
+void LoginPage::clearRememberedLogin()
+{
+    QSettings settings;
+    settings.remove(QStringLiteral("auth/phone"));
+    settings.remove(QStringLiteral("auth/remember"));
+    restoringSession_ = false;
+    pendingPhone_.clear();
 }
 
 void LoginPage::showHint(const QString& text, bool isError)

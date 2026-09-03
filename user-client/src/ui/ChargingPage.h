@@ -21,6 +21,8 @@ class ChargingPage : public QWidget
 public:
     explicit ChargingPage(NetworkClient* networkClient, QWidget* parent = nullptr);
 
+    // 从底部“充电”入口进入时没有预先选中的桩；仍会先检查服务端未完成订单。
+    void openEmpty();
     void openWithCharger(const ChargerInfo& charger,
                          const QString& stationName,
                          double pricePerKwh);
@@ -101,6 +103,7 @@ private:
     bool requestInFlight_ = false;
     bool pollInFlight_ = false;
     bool serverEnergyKnown_ = false;
+    bool errorNeedsStationRefresh_ = false;
     int pollTicks_ = 0;
     double previewBalance_ = 128.60;
 };

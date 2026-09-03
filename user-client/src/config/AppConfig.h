@@ -7,6 +7,8 @@ namespace appConfig {
 
 inline constexpr const char* kAmapWebServiceKeyEnvironment = "AMAP_WEB_SERVICE_KEY";
 inline constexpr const char* kAmapGeocoderUrl = "https://restapi.amap.com/v3/geocode/geo";
+inline constexpr const char* kAmapDrivingUrl = "https://restapi.amap.com/v3/direction/driving";
+inline constexpr const char* kAmapWalkingUrl = "https://restapi.amap.com/v3/direction/walking";
 inline constexpr const char* kAmapJsApiKeyEnvironment = "AMAP_JS_API_KEY";
 inline constexpr const char* kAmapJsApiSecretEnvironment = "AMAP_JS_API_SECRET";
 

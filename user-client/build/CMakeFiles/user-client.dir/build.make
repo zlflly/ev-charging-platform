@@ -72,7 +72,40 @@ include CMakeFiles/user-client.dir/flags.make
 .rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/images/login_bg.png
 .rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/images/station_pile_generated.png
 .rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/images/charging_bg.png
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/images/navigation_arrival_generated.png
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/arrow.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/back.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/charge.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/chevron.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/copy.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/coupon.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/destination.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/drive.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/favorite.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/fee.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/home.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/info.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/layers.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/locate.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/minus.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/navigate_button.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/navigate.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/order.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/overview.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/phone.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/plus.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/profile.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/riding.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/search.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/settings.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/station.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/straight.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/traffic.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/turn_left.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/turn_right.svg
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/icons/walk.svg
 .rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/home-map.html
+.rcc/qrc_app_resources.cpp: /mnt/d/User/Desktop/ev-charging/user-client/resources/navigation-map.html
 .rcc/qrc_app_resources.cpp: .rcc/app_resources.qrc
 .rcc/qrc_app_resources.cpp: /usr/lib/qt6/libexec/rcc
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Running rcc for resource app_resources"
@@ -155,10 +188,24 @@ CMakeFiles/user-client.dir/src/geo/Geocoder.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/user-client.dir/src/geo/Geocoder.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/d/User/Desktop/ev-charging/user-client/src/geo/Geocoder.cpp -o CMakeFiles/user-client.dir/src/geo/Geocoder.cpp.s
 
+CMakeFiles/user-client.dir/src/geo/RoutePlanner.cpp.o: CMakeFiles/user-client.dir/flags.make
+CMakeFiles/user-client.dir/src/geo/RoutePlanner.cpp.o: /mnt/d/User/Desktop/ev-charging/user-client/src/geo/RoutePlanner.cpp
+CMakeFiles/user-client.dir/src/geo/RoutePlanner.cpp.o: CMakeFiles/user-client.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object CMakeFiles/user-client.dir/src/geo/RoutePlanner.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/user-client.dir/src/geo/RoutePlanner.cpp.o -MF CMakeFiles/user-client.dir/src/geo/RoutePlanner.cpp.o.d -o CMakeFiles/user-client.dir/src/geo/RoutePlanner.cpp.o -c /mnt/d/User/Desktop/ev-charging/user-client/src/geo/RoutePlanner.cpp
+
+CMakeFiles/user-client.dir/src/geo/RoutePlanner.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/user-client.dir/src/geo/RoutePlanner.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/d/User/Desktop/ev-charging/user-client/src/geo/RoutePlanner.cpp > CMakeFiles/user-client.dir/src/geo/RoutePlanner.cpp.i
+
+CMakeFiles/user-client.dir/src/geo/RoutePlanner.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/user-client.dir/src/geo/RoutePlanner.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/d/User/Desktop/ev-charging/user-client/src/geo/RoutePlanner.cpp -o CMakeFiles/user-client.dir/src/geo/RoutePlanner.cpp.s
+
 CMakeFiles/user-client.dir/src/ui/LoginPage.cpp.o: CMakeFiles/user-client.dir/flags.make
 CMakeFiles/user-client.dir/src/ui/LoginPage.cpp.o: /mnt/d/User/Desktop/ev-charging/user-client/src/ui/LoginPage.cpp
 CMakeFiles/user-client.dir/src/ui/LoginPage.cpp.o: CMakeFiles/user-client.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object CMakeFiles/user-client.dir/src/ui/LoginPage.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building CXX object CMakeFiles/user-client.dir/src/ui/LoginPage.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/user-client.dir/src/ui/LoginPage.cpp.o -MF CMakeFiles/user-client.dir/src/ui/LoginPage.cpp.o.d -o CMakeFiles/user-client.dir/src/ui/LoginPage.cpp.o -c /mnt/d/User/Desktop/ev-charging/user-client/src/ui/LoginPage.cpp
 
 CMakeFiles/user-client.dir/src/ui/LoginPage.cpp.i: cmake_force
@@ -172,7 +219,7 @@ CMakeFiles/user-client.dir/src/ui/LoginPage.cpp.s: cmake_force
 CMakeFiles/user-client.dir/src/ui/HomePage.cpp.o: CMakeFiles/user-client.dir/flags.make
 CMakeFiles/user-client.dir/src/ui/HomePage.cpp.o: /mnt/d/User/Desktop/ev-charging/user-client/src/ui/HomePage.cpp
 CMakeFiles/user-client.dir/src/ui/HomePage.cpp.o: CMakeFiles/user-client.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building CXX object CMakeFiles/user-client.dir/src/ui/HomePage.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Building CXX object CMakeFiles/user-client.dir/src/ui/HomePage.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/user-client.dir/src/ui/HomePage.cpp.o -MF CMakeFiles/user-client.dir/src/ui/HomePage.cpp.o.d -o CMakeFiles/user-client.dir/src/ui/HomePage.cpp.o -c /mnt/d/User/Desktop/ev-charging/user-client/src/ui/HomePage.cpp
 
 CMakeFiles/user-client.dir/src/ui/HomePage.cpp.i: cmake_force
@@ -186,7 +233,7 @@ CMakeFiles/user-client.dir/src/ui/HomePage.cpp.s: cmake_force
 CMakeFiles/user-client.dir/src/ui/StationCard.cpp.o: CMakeFiles/user-client.dir/flags.make
 CMakeFiles/user-client.dir/src/ui/StationCard.cpp.o: /mnt/d/User/Desktop/ev-charging/user-client/src/ui/StationCard.cpp
 CMakeFiles/user-client.dir/src/ui/StationCard.cpp.o: CMakeFiles/user-client.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Building CXX object CMakeFiles/user-client.dir/src/ui/StationCard.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_11) "Building CXX object CMakeFiles/user-client.dir/src/ui/StationCard.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/user-client.dir/src/ui/StationCard.cpp.o -MF CMakeFiles/user-client.dir/src/ui/StationCard.cpp.o.d -o CMakeFiles/user-client.dir/src/ui/StationCard.cpp.o -c /mnt/d/User/Desktop/ev-charging/user-client/src/ui/StationCard.cpp
 
 CMakeFiles/user-client.dir/src/ui/StationCard.cpp.i: cmake_force
@@ -200,7 +247,7 @@ CMakeFiles/user-client.dir/src/ui/StationCard.cpp.s: cmake_force
 CMakeFiles/user-client.dir/src/ui/StationDetailPage.cpp.o: CMakeFiles/user-client.dir/flags.make
 CMakeFiles/user-client.dir/src/ui/StationDetailPage.cpp.o: /mnt/d/User/Desktop/ev-charging/user-client/src/ui/StationDetailPage.cpp
 CMakeFiles/user-client.dir/src/ui/StationDetailPage.cpp.o: CMakeFiles/user-client.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_11) "Building CXX object CMakeFiles/user-client.dir/src/ui/StationDetailPage.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Building CXX object CMakeFiles/user-client.dir/src/ui/StationDetailPage.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/user-client.dir/src/ui/StationDetailPage.cpp.o -MF CMakeFiles/user-client.dir/src/ui/StationDetailPage.cpp.o.d -o CMakeFiles/user-client.dir/src/ui/StationDetailPage.cpp.o -c /mnt/d/User/Desktop/ev-charging/user-client/src/ui/StationDetailPage.cpp
 
 CMakeFiles/user-client.dir/src/ui/StationDetailPage.cpp.i: cmake_force
@@ -214,7 +261,7 @@ CMakeFiles/user-client.dir/src/ui/StationDetailPage.cpp.s: cmake_force
 CMakeFiles/user-client.dir/src/ui/ChargerCard.cpp.o: CMakeFiles/user-client.dir/flags.make
 CMakeFiles/user-client.dir/src/ui/ChargerCard.cpp.o: /mnt/d/User/Desktop/ev-charging/user-client/src/ui/ChargerCard.cpp
 CMakeFiles/user-client.dir/src/ui/ChargerCard.cpp.o: CMakeFiles/user-client.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Building CXX object CMakeFiles/user-client.dir/src/ui/ChargerCard.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Building CXX object CMakeFiles/user-client.dir/src/ui/ChargerCard.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/user-client.dir/src/ui/ChargerCard.cpp.o -MF CMakeFiles/user-client.dir/src/ui/ChargerCard.cpp.o.d -o CMakeFiles/user-client.dir/src/ui/ChargerCard.cpp.o -c /mnt/d/User/Desktop/ev-charging/user-client/src/ui/ChargerCard.cpp
 
 CMakeFiles/user-client.dir/src/ui/ChargerCard.cpp.i: cmake_force
@@ -228,7 +275,7 @@ CMakeFiles/user-client.dir/src/ui/ChargerCard.cpp.s: cmake_force
 CMakeFiles/user-client.dir/src/ui/ChargingHeroWidget.cpp.o: CMakeFiles/user-client.dir/flags.make
 CMakeFiles/user-client.dir/src/ui/ChargingHeroWidget.cpp.o: /mnt/d/User/Desktop/ev-charging/user-client/src/ui/ChargingHeroWidget.cpp
 CMakeFiles/user-client.dir/src/ui/ChargingHeroWidget.cpp.o: CMakeFiles/user-client.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Building CXX object CMakeFiles/user-client.dir/src/ui/ChargingHeroWidget.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Building CXX object CMakeFiles/user-client.dir/src/ui/ChargingHeroWidget.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/user-client.dir/src/ui/ChargingHeroWidget.cpp.o -MF CMakeFiles/user-client.dir/src/ui/ChargingHeroWidget.cpp.o.d -o CMakeFiles/user-client.dir/src/ui/ChargingHeroWidget.cpp.o -c /mnt/d/User/Desktop/ev-charging/user-client/src/ui/ChargingHeroWidget.cpp
 
 CMakeFiles/user-client.dir/src/ui/ChargingHeroWidget.cpp.i: cmake_force
@@ -242,7 +289,7 @@ CMakeFiles/user-client.dir/src/ui/ChargingHeroWidget.cpp.s: cmake_force
 CMakeFiles/user-client.dir/src/ui/ChargingPage.cpp.o: CMakeFiles/user-client.dir/flags.make
 CMakeFiles/user-client.dir/src/ui/ChargingPage.cpp.o: /mnt/d/User/Desktop/ev-charging/user-client/src/ui/ChargingPage.cpp
 CMakeFiles/user-client.dir/src/ui/ChargingPage.cpp.o: CMakeFiles/user-client.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Building CXX object CMakeFiles/user-client.dir/src/ui/ChargingPage.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_15) "Building CXX object CMakeFiles/user-client.dir/src/ui/ChargingPage.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/user-client.dir/src/ui/ChargingPage.cpp.o -MF CMakeFiles/user-client.dir/src/ui/ChargingPage.cpp.o.d -o CMakeFiles/user-client.dir/src/ui/ChargingPage.cpp.o -c /mnt/d/User/Desktop/ev-charging/user-client/src/ui/ChargingPage.cpp
 
 CMakeFiles/user-client.dir/src/ui/ChargingPage.cpp.i: cmake_force
@@ -256,7 +303,7 @@ CMakeFiles/user-client.dir/src/ui/ChargingPage.cpp.s: cmake_force
 CMakeFiles/user-client.dir/src/ui/SettlementPage.cpp.o: CMakeFiles/user-client.dir/flags.make
 CMakeFiles/user-client.dir/src/ui/SettlementPage.cpp.o: /mnt/d/User/Desktop/ev-charging/user-client/src/ui/SettlementPage.cpp
 CMakeFiles/user-client.dir/src/ui/SettlementPage.cpp.o: CMakeFiles/user-client.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_15) "Building CXX object CMakeFiles/user-client.dir/src/ui/SettlementPage.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_16) "Building CXX object CMakeFiles/user-client.dir/src/ui/SettlementPage.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/user-client.dir/src/ui/SettlementPage.cpp.o -MF CMakeFiles/user-client.dir/src/ui/SettlementPage.cpp.o.d -o CMakeFiles/user-client.dir/src/ui/SettlementPage.cpp.o -c /mnt/d/User/Desktop/ev-charging/user-client/src/ui/SettlementPage.cpp
 
 CMakeFiles/user-client.dir/src/ui/SettlementPage.cpp.i: cmake_force
@@ -267,10 +314,52 @@ CMakeFiles/user-client.dir/src/ui/SettlementPage.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/user-client.dir/src/ui/SettlementPage.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/d/User/Desktop/ev-charging/user-client/src/ui/SettlementPage.cpp -o CMakeFiles/user-client.dir/src/ui/SettlementPage.cpp.s
 
+CMakeFiles/user-client.dir/src/ui/NavigationPage.cpp.o: CMakeFiles/user-client.dir/flags.make
+CMakeFiles/user-client.dir/src/ui/NavigationPage.cpp.o: /mnt/d/User/Desktop/ev-charging/user-client/src/ui/NavigationPage.cpp
+CMakeFiles/user-client.dir/src/ui/NavigationPage.cpp.o: CMakeFiles/user-client.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_17) "Building CXX object CMakeFiles/user-client.dir/src/ui/NavigationPage.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/user-client.dir/src/ui/NavigationPage.cpp.o -MF CMakeFiles/user-client.dir/src/ui/NavigationPage.cpp.o.d -o CMakeFiles/user-client.dir/src/ui/NavigationPage.cpp.o -c /mnt/d/User/Desktop/ev-charging/user-client/src/ui/NavigationPage.cpp
+
+CMakeFiles/user-client.dir/src/ui/NavigationPage.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/user-client.dir/src/ui/NavigationPage.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/d/User/Desktop/ev-charging/user-client/src/ui/NavigationPage.cpp > CMakeFiles/user-client.dir/src/ui/NavigationPage.cpp.i
+
+CMakeFiles/user-client.dir/src/ui/NavigationPage.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/user-client.dir/src/ui/NavigationPage.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/d/User/Desktop/ev-charging/user-client/src/ui/NavigationPage.cpp -o CMakeFiles/user-client.dir/src/ui/NavigationPage.cpp.s
+
+CMakeFiles/user-client.dir/src/ui/ProfilePage.cpp.o: CMakeFiles/user-client.dir/flags.make
+CMakeFiles/user-client.dir/src/ui/ProfilePage.cpp.o: /mnt/d/User/Desktop/ev-charging/user-client/src/ui/ProfilePage.cpp
+CMakeFiles/user-client.dir/src/ui/ProfilePage.cpp.o: CMakeFiles/user-client.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_18) "Building CXX object CMakeFiles/user-client.dir/src/ui/ProfilePage.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/user-client.dir/src/ui/ProfilePage.cpp.o -MF CMakeFiles/user-client.dir/src/ui/ProfilePage.cpp.o.d -o CMakeFiles/user-client.dir/src/ui/ProfilePage.cpp.o -c /mnt/d/User/Desktop/ev-charging/user-client/src/ui/ProfilePage.cpp
+
+CMakeFiles/user-client.dir/src/ui/ProfilePage.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/user-client.dir/src/ui/ProfilePage.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/d/User/Desktop/ev-charging/user-client/src/ui/ProfilePage.cpp > CMakeFiles/user-client.dir/src/ui/ProfilePage.cpp.i
+
+CMakeFiles/user-client.dir/src/ui/ProfilePage.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/user-client.dir/src/ui/ProfilePage.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/d/User/Desktop/ev-charging/user-client/src/ui/ProfilePage.cpp -o CMakeFiles/user-client.dir/src/ui/ProfilePage.cpp.s
+
+CMakeFiles/user-client.dir/src/ui/OrderPage.cpp.o: CMakeFiles/user-client.dir/flags.make
+CMakeFiles/user-client.dir/src/ui/OrderPage.cpp.o: /mnt/d/User/Desktop/ev-charging/user-client/src/ui/OrderPage.cpp
+CMakeFiles/user-client.dir/src/ui/OrderPage.cpp.o: CMakeFiles/user-client.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_19) "Building CXX object CMakeFiles/user-client.dir/src/ui/OrderPage.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/user-client.dir/src/ui/OrderPage.cpp.o -MF CMakeFiles/user-client.dir/src/ui/OrderPage.cpp.o.d -o CMakeFiles/user-client.dir/src/ui/OrderPage.cpp.o -c /mnt/d/User/Desktop/ev-charging/user-client/src/ui/OrderPage.cpp
+
+CMakeFiles/user-client.dir/src/ui/OrderPage.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/user-client.dir/src/ui/OrderPage.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /mnt/d/User/Desktop/ev-charging/user-client/src/ui/OrderPage.cpp > CMakeFiles/user-client.dir/src/ui/OrderPage.cpp.i
+
+CMakeFiles/user-client.dir/src/ui/OrderPage.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/user-client.dir/src/ui/OrderPage.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /mnt/d/User/Desktop/ev-charging/user-client/src/ui/OrderPage.cpp -o CMakeFiles/user-client.dir/src/ui/OrderPage.cpp.s
+
 CMakeFiles/user-client.dir/build/.rcc/qrc_app_resources.cpp.o: CMakeFiles/user-client.dir/flags.make
 CMakeFiles/user-client.dir/build/.rcc/qrc_app_resources.cpp.o: .rcc/qrc_app_resources.cpp
 CMakeFiles/user-client.dir/build/.rcc/qrc_app_resources.cpp.o: CMakeFiles/user-client.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_16) "Building CXX object CMakeFiles/user-client.dir/build/.rcc/qrc_app_resources.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_20) "Building CXX object CMakeFiles/user-client.dir/build/.rcc/qrc_app_resources.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/user-client.dir/build/.rcc/qrc_app_resources.cpp.o -MF CMakeFiles/user-client.dir/build/.rcc/qrc_app_resources.cpp.o.d -o CMakeFiles/user-client.dir/build/.rcc/qrc_app_resources.cpp.o -c /mnt/d/User/Desktop/ev-charging/user-client/build/.rcc/qrc_app_resources.cpp
 
 CMakeFiles/user-client.dir/build/.rcc/qrc_app_resources.cpp.i: cmake_force
@@ -288,6 +377,7 @@ user__client_OBJECTS = \
 "CMakeFiles/user-client.dir/src/net/NetworkClient.cpp.o" \
 "CMakeFiles/user-client.dir/src/session/Session.cpp.o" \
 "CMakeFiles/user-client.dir/src/geo/Geocoder.cpp.o" \
+"CMakeFiles/user-client.dir/src/geo/RoutePlanner.cpp.o" \
 "CMakeFiles/user-client.dir/src/ui/LoginPage.cpp.o" \
 "CMakeFiles/user-client.dir/src/ui/HomePage.cpp.o" \
 "CMakeFiles/user-client.dir/src/ui/StationCard.cpp.o" \
@@ -296,6 +386,9 @@ user__client_OBJECTS = \
 "CMakeFiles/user-client.dir/src/ui/ChargingHeroWidget.cpp.o" \
 "CMakeFiles/user-client.dir/src/ui/ChargingPage.cpp.o" \
 "CMakeFiles/user-client.dir/src/ui/SettlementPage.cpp.o" \
+"CMakeFiles/user-client.dir/src/ui/NavigationPage.cpp.o" \
+"CMakeFiles/user-client.dir/src/ui/ProfilePage.cpp.o" \
+"CMakeFiles/user-client.dir/src/ui/OrderPage.cpp.o" \
 "CMakeFiles/user-client.dir/build/.rcc/qrc_app_resources.cpp.o"
 
 # External object files for target user-client
@@ -306,6 +399,7 @@ user-client: CMakeFiles/user-client.dir/src/main.cpp.o
 user-client: CMakeFiles/user-client.dir/src/net/NetworkClient.cpp.o
 user-client: CMakeFiles/user-client.dir/src/session/Session.cpp.o
 user-client: CMakeFiles/user-client.dir/src/geo/Geocoder.cpp.o
+user-client: CMakeFiles/user-client.dir/src/geo/RoutePlanner.cpp.o
 user-client: CMakeFiles/user-client.dir/src/ui/LoginPage.cpp.o
 user-client: CMakeFiles/user-client.dir/src/ui/HomePage.cpp.o
 user-client: CMakeFiles/user-client.dir/src/ui/StationCard.cpp.o
@@ -314,6 +408,9 @@ user-client: CMakeFiles/user-client.dir/src/ui/ChargerCard.cpp.o
 user-client: CMakeFiles/user-client.dir/src/ui/ChargingHeroWidget.cpp.o
 user-client: CMakeFiles/user-client.dir/src/ui/ChargingPage.cpp.o
 user-client: CMakeFiles/user-client.dir/src/ui/SettlementPage.cpp.o
+user-client: CMakeFiles/user-client.dir/src/ui/NavigationPage.cpp.o
+user-client: CMakeFiles/user-client.dir/src/ui/ProfilePage.cpp.o
+user-client: CMakeFiles/user-client.dir/src/ui/OrderPage.cpp.o
 user-client: CMakeFiles/user-client.dir/build/.rcc/qrc_app_resources.cpp.o
 user-client: CMakeFiles/user-client.dir/build.make
 user-client: /usr/lib/x86_64-linux-gnu/libQt6WebEngineWidgets.so.6.4.2
@@ -332,7 +429,7 @@ user-client: /usr/lib/x86_64-linux-gnu/libQt6Core.so.6.4.2
 user-client: /usr/lib/x86_64-linux-gnu/libGLX.so
 user-client: /usr/lib/x86_64-linux-gnu/libOpenGL.so
 user-client: CMakeFiles/user-client.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_17) "Linking CXX executable user-client"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_21) "Linking CXX executable user-client"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/user-client.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

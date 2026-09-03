@@ -332,6 +332,7 @@ CMakeFiles/user-client.dir/src/main.cpp.o: \
  /usr/include/x86_64-linux-gnu/qt6/QtCore/QTimer \
  /usr/include/x86_64-linux-gnu/qt6/QtCore/qtimer.h \
  /usr/include/x86_64-linux-gnu/qt6/QtCore/qbasictimer.h \
+ /mnt/d/User/Desktop/ev-charging/user-client/src/session/Session.h \
  /mnt/d/User/Desktop/ev-charging/user-client/src/ui/ChargingPage.h \
  /mnt/d/User/Desktop/ev-charging/user-client/src/model/Order.h \
  /usr/include/x86_64-linux-gnu/qt6/QtCore/QDateTime \
@@ -389,6 +390,12 @@ CMakeFiles/user-client.dir/src/main.cpp.o: \
  /usr/include/x86_64-linux-gnu/qt6/QtGui/qtextoption.h \
  /usr/include/x86_64-linux-gnu/qt6/QtGui/QPixmap \
  /usr/include/x86_64-linux-gnu/qt6/QtGui/qpixmap.h \
+ /mnt/d/User/Desktop/ev-charging/user-client/src/ui/NavigationPage.h \
+ /mnt/d/User/Desktop/ev-charging/user-client/src/geo/RoutePlanner.h \
+ /usr/include/x86_64-linux-gnu/qt6/QtCore/QPointF \
+ /usr/include/x86_64-linux-gnu/qt6/QtCore/qpoint.h \
+ /mnt/d/User/Desktop/ev-charging/user-client/src/ui/OrderPage.h \
+ /mnt/d/User/Desktop/ev-charging/user-client/src/ui/ProfilePage.h \
  /mnt/d/User/Desktop/ev-charging/user-client/src/ui/SettlementPage.h \
  /mnt/d/User/Desktop/ev-charging/user-client/src/ui/StationDetailPage.h \
  /mnt/d/User/Desktop/ev-charging/user-client/src/ui/theme/Theme.h \
@@ -437,7 +444,6 @@ CMakeFiles/user-client.dir/src/main.cpp.o: \
  /usr/include/x86_64-linux-gnu/qt6/QtCore/QFile \
  /usr/include/x86_64-linux-gnu/qt6/QtCore/qfile.h \
  /usr/include/x86_64-linux-gnu/qt6/QtCore/QPoint \
- /usr/include/x86_64-linux-gnu/qt6/QtCore/qpoint.h \
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/QStackedWidget \
  /usr/include/x86_64-linux-gnu/qt6/QtWidgets/qstackedwidget.h \
  /usr/include/x86_64-linux-gnu/qt6/QtCore/QStringList \

@@ -390,6 +390,12 @@
 			null
 		],
 		[
+			"/mnt/d/User/Desktop/ev-charging/user-client/src/geo/RoutePlanner.h",
+			"MU",
+			"CG2SJ52CHU/moc_RoutePlanner.cpp",
+			null
+		],
+		[
 			"/mnt/d/User/Desktop/ev-charging/user-client/src/model/Order.h",
 			"MU",
 			"VNQA4LF4BW/moc_Order.cpp",
@@ -441,6 +447,24 @@
 			"/mnt/d/User/Desktop/ev-charging/user-client/src/ui/LoginPage.h",
 			"MU",
 			"YPKJ5OE7LN/moc_LoginPage.cpp",
+			null
+		],
+		[
+			"/mnt/d/User/Desktop/ev-charging/user-client/src/ui/NavigationPage.h",
+			"MU",
+			"YPKJ5OE7LN/moc_NavigationPage.cpp",
+			null
+		],
+		[
+			"/mnt/d/User/Desktop/ev-charging/user-client/src/ui/OrderPage.h",
+			"MU",
+			"YPKJ5OE7LN/moc_OrderPage.cpp",
+			null
+		],
+		[
+			"/mnt/d/User/Desktop/ev-charging/user-client/src/ui/ProfilePage.h",
+			"MU",
+			"YPKJ5OE7LN/moc_ProfilePage.cpp",
 			null
 		],
 		[
@@ -564,6 +588,11 @@
 			null
 		],
 		[
+			"/mnt/d/User/Desktop/ev-charging/user-client/src/geo/RoutePlanner.cpp",
+			"MU",
+			null
+		],
+		[
 			"/mnt/d/User/Desktop/ev-charging/user-client/src/main.cpp",
 			"MU",
 			null
@@ -600,6 +629,21 @@
 		],
 		[
 			"/mnt/d/User/Desktop/ev-charging/user-client/src/ui/LoginPage.cpp",
+			"MU",
+			null
+		],
+		[
+			"/mnt/d/User/Desktop/ev-charging/user-client/src/ui/NavigationPage.cpp",
+			"MU",
+			null
+		],
+		[
+			"/mnt/d/User/Desktop/ev-charging/user-client/src/ui/OrderPage.cpp",
+			"MU",
+			null
+		],
+		[
+			"/mnt/d/User/Desktop/ev-charging/user-client/src/ui/ProfilePage.cpp",
 			"MU",
 			null
 		],

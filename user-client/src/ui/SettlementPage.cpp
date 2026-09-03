@@ -6,6 +6,7 @@
 #include "ui/theme/Theme.h"
 
 #include <QFrame>
+#include <QIcon>
 #include <QJsonObject>
 #include <QLabel>
 #include <QPainter>
@@ -23,6 +24,19 @@ QString cssRgba(const QColor& color, int alpha)
 {
     return QStringLiteral("rgba(%1,%2,%3,%4)")
         .arg(color.red()).arg(color.green()).arg(color.blue()).arg(alpha);
+}
+
+QPixmap tintedSvgPixmap(const QString& resourcePath, const QSize& size,
+                        const QColor& color)
+{
+    const QPixmap source = QIcon(resourcePath).pixmap(size);
+    if (source.isNull()) return {};
+    QPixmap tinted(size);
+    tinted.fill(color);
+    QPainter painter(&tinted);
+    painter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+    painter.drawPixmap(0, 0, source);
+    return tinted;
 }
 
 void setLabelStyle(QLabel* label, int pixelSize, const QColor& color,
@@ -59,12 +73,13 @@ protected:
     {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setPen(QPen(theme::textPrimary(), 2.8, Qt::SolidLine,
-                            Qt::RoundCap, Qt::RoundJoin));
-        const qreal cy = height() / 2.0;
-        painter.drawLine(QPointF(25, cy), QPointF(10, cy));
-        painter.drawLine(QPointF(10, cy), QPointF(21, cy - 11));
-        painter.drawLine(QPointF(10, cy), QPointF(21, cy + 11));
+        const QPixmap icon = tintedSvgPixmap(
+            QStringLiteral(":/resources/icons/back.svg"), QSize(26, 26),
+            theme::textPrimary());
+        if (!icon.isNull()) {
+            painter.drawPixmap((width() - icon.width()) / 2,
+                               (height() - icon.height()) / 2, icon);
+        }
     }
 };
 
@@ -342,8 +357,17 @@ void SettlementPage::settleOrder()
         [this](const protocol::Response& response) {
             requestInFlight_ = false;
             if (!response.isOk()) {
-                showError(protocol::describeError(response.code,
-                                                  response.message));
+                if (response.code == protocol::CodeBalanceInsufficient) {
+                    const double deficit = response.data
+                        .value(QStringLiteral("deficit")).toDouble();
+                    showError(deficit > 0.0
+                                  ? QStringLiteral("余额不足，还需充值 ¥%1；订单仍保留，可充值后重试")
+                                        .arg(deficit, 0, 'f', 2)
+                                  : QStringLiteral("余额不足，订单仍保留，可充值后重试"));
+                } else {
+                    showError(protocol::describeError(response.code,
+                                                      response.message));
+                }
                 return;
             }
             if (response.data.contains(QStringLiteral("balance"))) {

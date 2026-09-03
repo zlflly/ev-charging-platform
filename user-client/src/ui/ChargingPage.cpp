@@ -11,6 +11,7 @@
 #include <QDateTime>
 #include <QFrame>
 #include <QJsonObject>
+#include <QIcon>
 #include <QLabel>
 #include <QMessageBox>
 #include <QPainter>
@@ -30,6 +31,19 @@ QString cssRgba(const QColor& color, int alpha)
 {
     return QStringLiteral("rgba(%1,%2,%3,%4)")
         .arg(color.red()).arg(color.green()).arg(color.blue()).arg(alpha);
+}
+
+QPixmap tintedSvgPixmap(const QString& resourcePath, const QSize& size,
+                        const QColor& color)
+{
+    const QPixmap source = QIcon(resourcePath).pixmap(size);
+    if (source.isNull()) return {};
+    QPixmap tinted(size);
+    tinted.fill(color);
+    QPainter painter(&tinted);
+    painter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+    painter.drawPixmap(0, 0, source);
+    return tinted;
 }
 
 void setLabelStyle(QLabel* label, int pixelSize, const QColor& color,
@@ -66,12 +80,13 @@ protected:
     {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setPen(QPen(theme::textPrimary(), 2.8, Qt::SolidLine,
-                            Qt::RoundCap, Qt::RoundJoin));
-        const qreal cy = height() / 2.0;
-        painter.drawLine(QPointF(25, cy), QPointF(10, cy));
-        painter.drawLine(QPointF(10, cy), QPointF(21, cy - 11));
-        painter.drawLine(QPointF(10, cy), QPointF(21, cy + 11));
+        const QPixmap icon = tintedSvgPixmap(
+            QStringLiteral(":/resources/icons/back.svg"), QSize(26, 26),
+            theme::textPrimary());
+        if (!icon.isNull()) {
+            painter.drawPixmap((width() - icon.width()) / 2,
+                               (height() - icon.height()) / 2, icon);
+        }
     }
 };
 
@@ -89,6 +104,14 @@ protected:
     {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing, true);
+        const QPixmap icon = tintedSvgPixmap(
+            QStringLiteral(":/resources/icons/copy.svg"), QSize(22, 22),
+            theme::textSecondary());
+        if (!icon.isNull()) {
+            painter.drawPixmap((width() - icon.width()) / 2,
+                               (height() - icon.height()) / 2, icon);
+            return;
+        }
         painter.setPen(QPen(theme::textSecondary(), 1.5, Qt::SolidLine,
                             Qt::RoundCap, Qt::RoundJoin));
         painter.setBrush(Qt::NoBrush);
@@ -117,16 +140,12 @@ protected:
         painter.setBrush(fill);
         painter.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 17, 17);
 
-        const QPointF center(28, height() / 2.0);
-        painter.setPen(QPen(theme::textPrimary(), 1.7));
-        painter.setBrush(Qt::NoBrush);
-        painter.drawEllipse(center, 10, 10);
-        QFont currencyFont(QStringLiteral("Microsoft YaHei UI"));
-        currencyFont.setPixelSize(14);
-        currencyFont.setWeight(QFont::DemiBold);
-        painter.setFont(currencyFont);
-        painter.drawText(QRectF(19, height() / 2.0 - 10, 18, 20),
-                         Qt::AlignCenter, QStringLiteral("¥"));
+        const QPixmap feeIcon = tintedSvgPixmap(
+            QStringLiteral(":/resources/icons/fee.svg"), QSize(24, 24),
+            theme::textPrimary());
+        if (!feeIcon.isNull()) {
+            painter.drawPixmap(16, (height() - feeIcon.height()) / 2, feeIcon);
+        }
 
         QFont textFont(QStringLiteral("Microsoft YaHei UI"));
         textFont.setPixelSize(17);
@@ -135,12 +154,12 @@ protected:
         painter.drawText(QRectF(53, 0, width() - 100, height()),
                          Qt::AlignVCenter | Qt::AlignLeft, text());
 
-        painter.setPen(QPen(theme::textSecondary(), 2.0, Qt::SolidLine,
-                            Qt::RoundCap, Qt::RoundJoin));
-        painter.drawLine(QPointF(width() - 28, height() / 2.0 - 6),
-                         QPointF(width() - 22, height() / 2.0));
-        painter.drawLine(QPointF(width() - 22, height() / 2.0),
-                         QPointF(width() - 28, height() / 2.0 + 6));
+        const QPixmap arrow = tintedSvgPixmap(
+            QStringLiteral(":/resources/icons/chevron.svg"), QSize(16, 16),
+            theme::textSecondary());
+        if (!arrow.isNull()) {
+            painter.drawPixmap(width() - 34, (height() - arrow.height()) / 2, arrow);
+        }
     }
 };
 
@@ -325,6 +344,7 @@ void ChargingPage::openWithCharger(const ChargerInfo& charger,
     requestInFlight_ = false;
     pollInFlight_ = false;
     serverEnergyKnown_ = false;
+    errorNeedsStationRefresh_ = false;
     pollTicks_ = 0;
     renderInitialState();
 
@@ -332,6 +352,27 @@ void ChargingPage::openWithCharger(const ChargerInfo& charger,
         return;
     }
     requestActiveOrder();
+}
+
+void ChargingPage::openEmpty()
+{
+    ticker_->stop();
+    pendingCharger_ = ChargerInfo{};
+    pendingStationName_.clear();
+    pendingPricePerKwh_ = 0.0;
+    currentOrder_ = OrderInfo{};
+    hasOrder_ = false;
+    state_ = Initial;
+    requestInFlight_ = false;
+    pollInFlight_ = false;
+    serverEnergyKnown_ = false;
+    errorNeedsStationRefresh_ = false;
+    pollTicks_ = 0;
+    renderInitialState();
+
+    if (!previewMode()) {
+        requestActiveOrder();
+    }
 }
 
 bool ChargingPage::previewMode() const
@@ -379,7 +420,40 @@ void ChargingPage::requestActiveOrder()
             }
             currentOrder_ = order;
             hasOrder_ = true;
-            serverEnergyKnown_ = order.energyKwh > 0.0;
+            const QJsonObject orderJson =
+                response.data.value(QStringLiteral("order")).toObject();
+            serverEnergyKnown_ = orderJson.contains(QStringLiteral("energyKwh"));
+
+            // 当前用户已有订单时，充电入口必须恢复该订单，而不能继续操作
+            // 刚刚点开的另一根桩。WAIT_SETTLEMENT 直接进入结算页。
+            if (!pendingCharger_.valid() ||
+                pendingCharger_.chargerId != order.chargerId) {
+                pendingCharger_.chargerId = order.chargerId;
+                pendingCharger_.code = order.chargerCode;
+                pendingCharger_.type = order.chargerType;
+                pendingCharger_.status = protocol::ChargerStatusCharging;
+                pendingCharger_.powerKw = order.powerKw;
+                if (pendingStationName_.isEmpty()) {
+                    pendingStationName_ = order.stationName;
+                }
+                if (pendingPricePerKwh_ <= 0.0) {
+                    pendingPricePerKwh_ = order.pricePerKwh;
+                }
+            }
+
+            if (order.statusEnum() == OrderInfo::StatusWaitSettlement) {
+                ticker_->stop();
+                emit settlementRequested(currentOrder_);
+                return;
+            }
+            if (order.statusEnum() == OrderInfo::StatusFinished ||
+                order.statusEnum() == OrderInfo::StatusCancelled) {
+                currentOrder_ = OrderInfo{};
+                hasOrder_ = false;
+                state_ = Initial;
+                renderInitialState();
+                return;
+            }
             state_ = order.statusEnum() == OrderInfo::StatusReserved
                 ? Reserved : order.statusEnum() == OrderInfo::StatusCharging
                 ? Charging : Error;
@@ -402,12 +476,29 @@ void ChargingPage::requestOrderStatus()
         QString::fromUtf8(protocol::action::kOrderStatus), {},
         [this](const protocol::Response& response) {
             pollInFlight_ = false;
-            if (!response.isOk()) return;
-            const OrderInfo updated = OrderInfo::fromJson(
-                response.data.value(QStringLiteral("order")).toObject());
-            if (!updated.valid()) return;
+            if (!response.isOk()) {
+                if (response.code == protocol::CodeOrderConflict) {
+                    // 订单可能已被服务端停止/结算，停止本地 ticker 后重新读取
+                    // active，避免继续展示已经失效的客户端状态。
+                    ticker_->stop();
+                    requestActiveOrder();
+                } else if (response.code == protocol::CodeNotLoggedIn) {
+                    ticker_->stop();
+                    renderErrorState(protocol::describeError(response.code,
+                                                             response.message));
+                }
+                return;
+            }
+            const QJsonObject orderJson =
+                response.data.value(QStringLiteral("order")).toObject();
+            const OrderInfo updated = OrderInfo::fromJson(orderJson);
+            if (!updated.valid()) {
+                ticker_->stop();
+                requestActiveOrder();
+                return;
+            }
             currentOrder_ = updated;
-            serverEnergyKnown_ = updated.energyKwh > 0.0;
+            serverEnergyKnown_ = orderJson.contains(QStringLiteral("energyKwh"));
             if (updated.statusEnum() == OrderInfo::StatusWaitSettlement) {
                 ticker_->stop();
                 emit settlementRequested(currentOrder_);
@@ -421,7 +512,16 @@ void ChargingPage::onActionClicked()
 {
     if (requestInFlight_) return;
     if (state_ == Error) {
+        if (errorNeedsStationRefresh_) {
+            emit backRequested();
+            return;
+        }
         requestActiveOrder();
+        return;
+    }
+    if (!pendingCharger_.valid()) {
+        setLabelStyle(hintLabel_, 13, theme::textSecondary());
+        hintLabel_->setText(QStringLiteral("请先从站点详情选择空闲充电桩"));
         return;
     }
     if (!hasOrder_) {
@@ -454,6 +554,16 @@ void ChargingPage::reserveCharger()
         [this](const protocol::Response& response) {
             setRequestInFlight(false);
             if (!response.isOk()) {
+                if (response.code == protocol::CodeOrderConflict) {
+                    requestActiveOrder();
+                    return;
+                }
+                if (response.code == protocol::CodeChargerUnavailable) {
+                    pendingCharger_ = ChargerInfo{};
+                    errorNeedsStationRefresh_ = true;
+                    renderErrorState(QStringLiteral("该桩刚刚被占用，请返回站点刷新后重新选择"));
+                    return;
+                }
                 renderErrorState(protocol::describeError(response.code,
                                                          response.message));
                 return;
@@ -461,7 +571,8 @@ void ChargingPage::reserveCharger()
             currentOrder_ = OrderInfo::fromJson(
                 response.data.value(QStringLiteral("order")).toObject());
             hasOrder_ = currentOrder_.valid();
-            serverEnergyKnown_ = currentOrder_.energyKwh > 0.0;
+            serverEnergyKnown_ = response.data.value(QStringLiteral("order"))
+                .toObject().contains(QStringLiteral("energyKwh"));
             state_ = Reserved;
             renderReservedState();
         });
@@ -489,6 +600,10 @@ void ChargingPage::startCharging()
         [this](const protocol::Response& response) {
             setRequestInFlight(false);
             if (!response.isOk()) {
+                if (response.code == protocol::CodeOrderConflict) {
+                    requestActiveOrder();
+                    return;
+                }
                 renderErrorState(protocol::describeError(response.code,
                                                          response.message));
                 return;
@@ -497,7 +612,8 @@ void ChargingPage::startCharging()
                 response.data.value(QStringLiteral("order")).toObject());
             state_ = Charging;
             hasOrder_ = currentOrder_.valid();
-            serverEnergyKnown_ = currentOrder_.energyKwh > 0.0;
+            serverEnergyKnown_ = response.data.value(QStringLiteral("order"))
+                .toObject().contains(QStringLiteral("energyKwh"));
             renderChargingState();
         });
 }
@@ -558,10 +674,14 @@ void ChargingPage::renderInitialState()
     estimatedValueLabel_->setText(QStringLiteral("¥0.00"));
     updateBalanceLabel();
     actionButton_->setVisible(true);
-    actionButton_->setEnabled(!requestInFlight_);
-    actionButton_->setText(QStringLiteral("预约充电"));
+    actionButton_->setEnabled(pendingCharger_.valid() && !requestInFlight_);
+    actionButton_->setText(pendingCharger_.valid()
+                               ? QStringLiteral("预约充电")
+                               : QStringLiteral("请选择充电桩"));
     setLabelStyle(hintLabel_, 13, theme::textSecondary());
-    hintLabel_->setText(QStringLiteral("预约成功后才会开始计费"));
+    hintLabel_->setText(pendingCharger_.valid()
+                            ? QStringLiteral("预约成功后才会开始计费")
+                            : QStringLiteral("请先从站点详情选择空闲充电桩"));
 }
 
 void ChargingPage::renderReservedState()
@@ -606,7 +726,9 @@ void ChargingPage::renderErrorState(const QString& message)
     titleLabel_->setText(QStringLiteral("充电"));
     actionButton_->setVisible(true);
     actionButton_->setEnabled(true);
-    actionButton_->setText(QStringLiteral("重试"));
+    actionButton_->setText(errorNeedsStationRefresh_
+                               ? QStringLiteral("返回站点刷新")
+                               : QStringLiteral("重试"));
     setLabelStyle(hintLabel_, 13, theme::danger());
     hintLabel_->setText(message);
 }
@@ -617,14 +739,20 @@ void ChargingPage::updateChargingReadout()
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
     const qint64 elapsedMs = currentOrder_.startTimeMs > 0
         ? qMax<qint64>(0, now - currentOrder_.startTimeMs) : 0;
-    const double power = currentOrder_.powerKw > 0.0 ? currentOrder_.powerKw : 42.0;
+    const double power = currentOrder_.powerKw > 0.0
+        ? currentOrder_.powerKw : (previewMode() ? 42.0 : 0.0);
     const double fallbackEnergy = power * static_cast<double>(elapsedMs) / 3600000.0;
     const bool useServerTelemetry = !previewMode() && serverEnergyKnown_;
-    const double energy = useServerTelemetry ? currentOrder_.energyKwh : fallbackEnergy;
+    // 正常模式下，电量/费用/进度只使用服务端订单状态；客户端估算只存在
+    // 于显式预览模式，避免把展示值误认为真实业务数据。
+    const double energy = useServerTelemetry ? currentOrder_.energyKwh
+                                             : (previewMode() ? fallbackEnergy : 0.0);
     const double price = currentOrder_.pricePerKwh > 0.0
         ? currentOrder_.pricePerKwh : pendingPricePerKwh_;
-    const double estimated = useServerTelemetry && currentOrder_.estimatedAmount > 0.0
-        ? currentOrder_.estimatedAmount : energy * price;
+    const double estimated = useServerTelemetry
+        ? (currentOrder_.estimatedAmount > 0.0
+               ? currentOrder_.estimatedAmount : currentOrder_.amount)
+        : (previewMode() ? energy * price : 0.0);
     heroWidget_->setProgress(progressForEnergy(energy));
     heroWidget_->setElapsedText(formatDuration(elapsedMs));
     energyValueLabel_->setText(QStringLiteral("%1 度").arg(energy, 0, 'f', 2));
@@ -649,9 +777,12 @@ QString ChargingPage::formatDuration(qint64 milliseconds) const
 
 double ChargingPage::progressForEnergy(double energyKwh) const
 {
-    // 服务端若提供目标电量/电池容量，用实际已充电量计算；否则使用
-    // 34.3 度作为预览标定值，使设计稿中的 12.35 度约落在 36%。
-    // 这只是展示进度，费用和订单结算仍以服务端返回值为准。
+    // 后端若直接返回进度，以服务端值为准；否则使用服务端实时电量除以
+    // 目标电量。当前协议尚未要求目标电量时，34.3 度只是环形 UI 的显示
+    // 标定容量，电量、费用和结算仍完全使用服务端数据。
+    if (currentOrder_.progressPercent >= 0.0) {
+        return qBound(0.0, currentOrder_.progressPercent, 99.0);
+    }
     const double targetEnergy = currentOrder_.targetEnergyKwh > 0.0
         ? currentOrder_.targetEnergyKwh : 34.3;
     return qBound(0.0, energyKwh / targetEnergy * 100.0, 99.0);
@@ -677,7 +808,7 @@ void ChargingPage::onChargingTick()
 {
     ++pollTicks_;
     updateChargingReadout();
-    if (pollTicks_ >= 12) {
+    if (pollTicks_ >= 4) {
         pollTicks_ = 0;
         requestOrderStatus();
     }

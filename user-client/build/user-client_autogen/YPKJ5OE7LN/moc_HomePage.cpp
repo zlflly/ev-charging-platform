@@ -26,20 +26,24 @@ QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
 namespace {
 struct qt_meta_stringdata_HomePage_t {
-    uint offsetsAndSizes[26];
+    uint offsetsAndSizes[34];
     char stringdata0[9];
     char stringdata1[16];
     char stringdata2[1];
     char stringdata3[10];
-    char stringdata4[16];
-    char stringdata5[14];
+    char stringdata4[18];
+    char stringdata5[18];
     char stringdata6[16];
-    char stringdata7[11];
-    char stringdata8[9];
-    char stringdata9[10];
-    char stringdata10[8];
-    char stringdata11[15];
-    char stringdata12[8];
+    char stringdata7[17];
+    char stringdata8[16];
+    char stringdata9[14];
+    char stringdata10[16];
+    char stringdata11[11];
+    char stringdata12[9];
+    char stringdata13[10];
+    char stringdata14[8];
+    char stringdata15[15];
+    char stringdata16[8];
 };
 #define QT_MOC_LITERAL(ofs, len) \
     uint(sizeof(qt_meta_stringdata_HomePage_t::offsetsAndSizes) + ofs), len 
@@ -49,20 +53,28 @@ Q_CONSTINIT static const qt_meta_stringdata_HomePage_t qt_meta_stringdata_HomePa
         QT_MOC_LITERAL(9, 15),  // "stationSelected"
         QT_MOC_LITERAL(25, 0),  // ""
         QT_MOC_LITERAL(26, 9),  // "stationId"
-        QT_MOC_LITERAL(36, 15),  // "onSearchClicked"
-        QT_MOC_LITERAL(52, 13),  // "onSortClicked"
-        QT_MOC_LITERAL(66, 15),  // "onLocateClicked"
-        QT_MOC_LITERAL(82, 10),  // "onGeocoded"
-        QT_MOC_LITERAL(93, 8),  // "latitude"
-        QT_MOC_LITERAL(102, 9),  // "longitude"
-        QT_MOC_LITERAL(112, 7),  // "address"
-        QT_MOC_LITERAL(120, 14),  // "onGeocodeError"
-        QT_MOC_LITERAL(135, 7)   // "message"
+        QT_MOC_LITERAL(36, 17),  // "stationsRequested"
+        QT_MOC_LITERAL(54, 17),  // "chargingRequested"
+        QT_MOC_LITERAL(72, 15),  // "ordersRequested"
+        QT_MOC_LITERAL(88, 16),  // "profileRequested"
+        QT_MOC_LITERAL(105, 15),  // "onSearchClicked"
+        QT_MOC_LITERAL(121, 13),  // "onSortClicked"
+        QT_MOC_LITERAL(135, 15),  // "onLocateClicked"
+        QT_MOC_LITERAL(151, 10),  // "onGeocoded"
+        QT_MOC_LITERAL(162, 8),  // "latitude"
+        QT_MOC_LITERAL(171, 9),  // "longitude"
+        QT_MOC_LITERAL(181, 7),  // "address"
+        QT_MOC_LITERAL(189, 14),  // "onGeocodeError"
+        QT_MOC_LITERAL(204, 7)   // "message"
     },
     "HomePage",
     "stationSelected",
     "",
     "stationId",
+    "stationsRequested",
+    "chargingRequested",
+    "ordersRequested",
+    "profileRequested",
     "onSearchClicked",
     "onSortClicked",
     "onLocateClicked",
@@ -82,32 +94,40 @@ Q_CONSTINIT static const uint qt_meta_data_HomePage[] = {
       10,       // revision
        0,       // classname
        0,    0, // classinfo
-       6,   14, // methods
+      10,   14, // methods
        0,    0, // properties
        0,    0, // enums/sets
        0,    0, // constructors
        0,       // flags
-       1,       // signalCount
+       5,       // signalCount
 
  // signals: name, argc, parameters, tag, flags, initial metatype offsets
-       1,    1,   50,    2, 0x06,    1 /* Public */,
+       1,    1,   74,    2, 0x06,    1 /* Public */,
+       4,    0,   77,    2, 0x06,    3 /* Public */,
+       5,    0,   78,    2, 0x06,    4 /* Public */,
+       6,    0,   79,    2, 0x06,    5 /* Public */,
+       7,    0,   80,    2, 0x06,    6 /* Public */,
 
  // slots: name, argc, parameters, tag, flags, initial metatype offsets
-       4,    0,   53,    2, 0x08,    3 /* Private */,
-       5,    0,   54,    2, 0x08,    4 /* Private */,
-       6,    0,   55,    2, 0x08,    5 /* Private */,
-       7,    3,   56,    2, 0x08,    6 /* Private */,
-      11,    1,   63,    2, 0x08,   10 /* Private */,
+       8,    0,   81,    2, 0x08,    7 /* Private */,
+       9,    0,   82,    2, 0x08,    8 /* Private */,
+      10,    0,   83,    2, 0x08,    9 /* Private */,
+      11,    3,   84,    2, 0x08,   10 /* Private */,
+      15,    1,   91,    2, 0x08,   14 /* Private */,
 
  // signals: parameters
     QMetaType::Void, QMetaType::LongLong,    3,
+    QMetaType::Void,
+    QMetaType::Void,
+    QMetaType::Void,
+    QMetaType::Void,
 
  // slots: parameters
     QMetaType::Void,
     QMetaType::Void,
     QMetaType::Void,
-    QMetaType::Void, QMetaType::Double, QMetaType::Double, QMetaType::QString,    8,    9,   10,
-    QMetaType::Void, QMetaType::QString,   12,
+    QMetaType::Void, QMetaType::Double, QMetaType::Double, QMetaType::QString,   12,   13,   14,
+    QMetaType::Void, QMetaType::QString,   16,
 
        0        // eod
 };
@@ -124,6 +144,14 @@ Q_CONSTINIT const QMetaObject HomePage::staticMetaObject = { {
         // method 'stationSelected'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
         QtPrivate::TypeAndForceComplete<qint64, std::false_type>,
+        // method 'stationsRequested'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'chargingRequested'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'ordersRequested'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'profileRequested'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
         // method 'onSearchClicked'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
         // method 'onSortClicked'
@@ -149,11 +177,15 @@ void HomePage::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, vo
         (void)_t;
         switch (_id) {
         case 0: _t->stationSelected((*reinterpret_cast< std::add_pointer_t<qint64>>(_a[1]))); break;
-        case 1: _t->onSearchClicked(); break;
-        case 2: _t->onSortClicked(); break;
-        case 3: _t->onLocateClicked(); break;
-        case 4: _t->onGeocoded((*reinterpret_cast< std::add_pointer_t<double>>(_a[1])),(*reinterpret_cast< std::add_pointer_t<double>>(_a[2])),(*reinterpret_cast< std::add_pointer_t<QString>>(_a[3]))); break;
-        case 5: _t->onGeocodeError((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1]))); break;
+        case 1: _t->stationsRequested(); break;
+        case 2: _t->chargingRequested(); break;
+        case 3: _t->ordersRequested(); break;
+        case 4: _t->profileRequested(); break;
+        case 5: _t->onSearchClicked(); break;
+        case 6: _t->onSortClicked(); break;
+        case 7: _t->onLocateClicked(); break;
+        case 8: _t->onGeocoded((*reinterpret_cast< std::add_pointer_t<double>>(_a[1])),(*reinterpret_cast< std::add_pointer_t<double>>(_a[2])),(*reinterpret_cast< std::add_pointer_t<QString>>(_a[3]))); break;
+        case 9: _t->onGeocodeError((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1]))); break;
         default: ;
         }
     } else if (_c == QMetaObject::IndexOfMethod) {
@@ -162,6 +194,34 @@ void HomePage::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, vo
             using _t = void (HomePage::*)(qint64 );
             if (_t _q_method = &HomePage::stationSelected; *reinterpret_cast<_t *>(_a[1]) == _q_method) {
                 *result = 0;
+                return;
+            }
+        }
+        {
+            using _t = void (HomePage::*)();
+            if (_t _q_method = &HomePage::stationsRequested; *reinterpret_cast<_t *>(_a[1]) == _q_method) {
+                *result = 1;
+                return;
+            }
+        }
+        {
+            using _t = void (HomePage::*)();
+            if (_t _q_method = &HomePage::chargingRequested; *reinterpret_cast<_t *>(_a[1]) == _q_method) {
+                *result = 2;
+                return;
+            }
+        }
+        {
+            using _t = void (HomePage::*)();
+            if (_t _q_method = &HomePage::ordersRequested; *reinterpret_cast<_t *>(_a[1]) == _q_method) {
+                *result = 3;
+                return;
+            }
+        }
+        {
+            using _t = void (HomePage::*)();
+            if (_t _q_method = &HomePage::profileRequested; *reinterpret_cast<_t *>(_a[1]) == _q_method) {
+                *result = 4;
                 return;
             }
         }
@@ -187,13 +247,13 @@ int HomePage::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 6)
+        if (_id < 10)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 6;
+        _id -= 10;
     } else if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 6)
+        if (_id < 10)
             *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType();
-        _id -= 6;
+        _id -= 10;
     }
     return _id;
 }
@@ -203,6 +263,30 @@ void HomePage::stationSelected(qint64 _t1)
 {
     void *_a[] = { nullptr, const_cast<void*>(reinterpret_cast<const void*>(std::addressof(_t1))) };
     QMetaObject::activate(this, &staticMetaObject, 0, _a);
+}
+
+// SIGNAL 1
+void HomePage::stationsRequested()
+{
+    QMetaObject::activate(this, &staticMetaObject, 1, nullptr);
+}
+
+// SIGNAL 2
+void HomePage::chargingRequested()
+{
+    QMetaObject::activate(this, &staticMetaObject, 2, nullptr);
+}
+
+// SIGNAL 3
+void HomePage::ordersRequested()
+{
+    QMetaObject::activate(this, &staticMetaObject, 3, nullptr);
+}
+
+// SIGNAL 4
+void HomePage::profileRequested()
+{
+    QMetaObject::activate(this, &staticMetaObject, 4, nullptr);
 }
 QT_WARNING_POP
 QT_END_MOC_NAMESPACE

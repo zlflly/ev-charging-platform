@@ -1,8 +1,12 @@
 #include "config/AppConfig.h"
 #include "net/NetworkClient.h"
+#include "session/Session.h"
 #include "ui/ChargingPage.h"
 #include "ui/HomePage.h"
 #include "ui/LoginPage.h"
+#include "ui/NavigationPage.h"
+#include "ui/OrderPage.h"
+#include "ui/ProfilePage.h"
 #include "ui/SettlementPage.h"
 #include "ui/StationDetailPage.h"
 #include "ui/theme/Theme.h"
@@ -125,11 +129,17 @@ int main(int argc, char* argv[])
     StationDetailPage stationDetailPage(&networkClient, &pageStack);
     ChargingPage chargingPage(&networkClient, &pageStack);
     SettlementPage settlementPage(&networkClient, &pageStack);
+    NavigationPage navigationPage(&networkClient, &pageStack);
+    OrderPage orderPage(&networkClient, &pageStack);
+    ProfilePage profilePage(&networkClient, &pageStack);
     pageStack.addWidget(&loginPage);
     pageStack.addWidget(&homePage);
     pageStack.addWidget(&stationDetailPage);
     pageStack.addWidget(&chargingPage);
     pageStack.addWidget(&settlementPage);
+    pageStack.addWidget(&navigationPage);
+    pageStack.addWidget(&orderPage);
+    pageStack.addWidget(&profilePage);
 
     // 让外层窗口按当前手机画布切换高度，页面之间仍共享同一个顶层窗口。
     loginPage.setMinimumSize(0, 0);
@@ -137,6 +147,9 @@ int main(int argc, char* argv[])
     stationDetailPage.setMinimumSize(0, 0);
     chargingPage.setMinimumSize(0, 0);
     settlementPage.setMinimumSize(0, 0);
+    navigationPage.setMinimumSize(0, 0);
+    orderPage.setMinimumSize(0, 0);
+    profilePage.setMinimumSize(0, 0);
 
     appWindow.setMinimumSize(360, theme::detailCanvasHeight);
 
@@ -156,8 +169,18 @@ int main(int argc, char* argv[])
         || !qgetenv("EV_CHARGING_SCREENSHOT_PATH").isEmpty();
     const bool settlementPreview = qEnvironmentVariableIsSet("EV_SETTLEMENT_PREVIEW")
         || !qgetenv("EV_SETTLEMENT_SCREENSHOT_PATH").isEmpty();
+    const bool navigationPreview = qEnvironmentVariableIsSet("EV_NAVIGATION_PREVIEW")
+        || qEnvironmentVariableIsSet("EV_NAVIGATION_ACTIVE_PREVIEW")
+        || qEnvironmentVariableIsSet("EV_NAVIGATION_FINISHED_PREVIEW")
+        || !qgetenv("EV_NAVIGATION_SCREENSHOT_PATH").isEmpty();
 
-    if (settlementPreview) {
+    if (navigationPreview) {
+        Session::instance().setLocation(41.7087, 123.4312,
+                                        QStringLiteral("沈阳市和平区三好街"));
+        navigationPage.openRoute(41.7195, 123.4312,
+                                 QStringLiteral("东软软件园充电站"), false);
+        showPage(&navigationPage, theme::loginCanvasHeight);
+    } else if (settlementPreview) {
         OrderInfo order;
         order.orderId = 202609030001;
         order.status = QStringLiteral("WAIT_SETTLEMENT");
@@ -194,11 +217,41 @@ int main(int argc, char* argv[])
     QObject::connect(&loginPage, &LoginPage::loginSucceeded, [&] {
         showPage(&homePage, theme::loginCanvasHeight);
     });
+    QObject::connect(&loginPage, &LoginPage::sessionRestored, [&] {
+        if (pageStack.currentWidget() == &loginPage) {
+            showPage(&homePage, theme::loginCanvasHeight);
+        } else if (pageStack.currentWidget() == &chargingPage) {
+            chargingPage.openEmpty();
+        } else if (pageStack.currentWidget() == &orderPage) {
+            orderPage.reload();
+        } else if (pageStack.currentWidget() == &profilePage) {
+            profilePage.reload();
+        } else {
+            homePage.refreshStations();
+        }
+    });
 
     QObject::connect(&homePage, &HomePage::stationSelected,
                      [&](qint64 stationId) {
         stationDetailPage.openStation(stationId);
         showPage(&stationDetailPage, theme::detailCanvasHeight);
+    });
+    QObject::connect(&homePage, &HomePage::stationsRequested,
+                     [&] { homePage.refreshStations(); });
+    QObject::connect(&homePage, &HomePage::chargingRequested,
+                     [&] {
+        chargingPage.openEmpty();
+        showPage(&chargingPage, theme::loginCanvasHeight);
+    });
+    QObject::connect(&homePage, &HomePage::ordersRequested,
+                     [&] {
+        orderPage.reload();
+        showPage(&orderPage, theme::loginCanvasHeight);
+    });
+    QObject::connect(&homePage, &HomePage::profileRequested,
+                     [&] {
+        profilePage.reload();
+        showPage(&profilePage, theme::loginCanvasHeight);
     });
     QObject::connect(&stationDetailPage, &StationDetailPage::chargerSelected,
                      [&](const ChargerInfo& charger, const QString& stationName,
@@ -210,8 +263,15 @@ int main(int argc, char* argv[])
                      [&] {
         showPage(&homePage, theme::loginCanvasHeight);
     });
+    QObject::connect(&stationDetailPage, &StationDetailPage::navigationRequested,
+                     [&](double latitude, double longitude,
+                         const QString& destinationName, bool walking) {
+        navigationPage.openRoute(latitude, longitude, destinationName, walking);
+        showPage(&navigationPage, theme::loginCanvasHeight);
+    });
     QObject::connect(&chargingPage, &ChargingPage::backRequested,
                      [&] {
+        stationDetailPage.refresh();
         showPage(&stationDetailPage, theme::detailCanvasHeight);
     });
     QObject::connect(&chargingPage, &ChargingPage::settlementRequested,
@@ -227,8 +287,73 @@ int main(int argc, char* argv[])
                      [&] {
         showPage(&homePage, theme::loginCanvasHeight);
     });
+    QObject::connect(&profilePage, &ProfilePage::backRequested,
+                     [&] { showPage(&homePage, theme::loginCanvasHeight); });
+    QObject::connect(&profilePage, &ProfilePage::homeRequested,
+                     [&] { showPage(&homePage, theme::loginCanvasHeight); });
+    QObject::connect(&profilePage, &ProfilePage::stationsRequested,
+                     [&] {
+        homePage.refreshStations();
+        showPage(&homePage, theme::loginCanvasHeight);
+    });
+    QObject::connect(&profilePage, &ProfilePage::chargingRequested,
+                     [&] {
+        chargingPage.openEmpty();
+        showPage(&chargingPage, theme::loginCanvasHeight);
+    });
+    QObject::connect(&profilePage, &ProfilePage::ordersRequested,
+                     [&] {
+        orderPage.reload();
+        showPage(&orderPage, theme::loginCanvasHeight);
+    });
+    QObject::connect(&profilePage, &ProfilePage::logoutRequested,
+                     [&] {
+        loginPage.clearRememberedLogin();
+        Session::instance().logout();
+        showPage(&loginPage, theme::loginCanvasHeight);
+    });
+    QObject::connect(&orderPage, &OrderPage::backRequested,
+                     [&] { showPage(&homePage, theme::loginCanvasHeight); });
+    QObject::connect(&orderPage, &OrderPage::continueOrderRequested,
+                     [&](const OrderInfo& order) {
+        if (order.statusEnum() == OrderInfo::StatusWaitSettlement) {
+            settlementPage.openOrder(order);
+            showPage(&settlementPage, theme::loginCanvasHeight);
+            return;
+        }
+        ChargerInfo charger;
+        charger.chargerId = order.chargerId;
+        charger.code = order.chargerCode;
+        charger.type = order.chargerType;
+        charger.status = protocol::ChargerStatusIdle;
+        charger.powerKw = order.powerKw;
+        chargingPage.openWithCharger(charger, order.stationName, order.pricePerKwh);
+        showPage(&chargingPage, theme::loginCanvasHeight);
+    });
+    QObject::connect(&orderPage, &OrderPage::navigateAgainRequested,
+                     [&](const OrderInfo& order) {
+        if ((order.latitude != 0.0 || order.longitude != 0.0) &&
+            Session::instance().hasLocation()) {
+            navigationPage.openRoute(order.latitude, order.longitude,
+                                     order.stationName, false);
+            showPage(&navigationPage, theme::loginCanvasHeight);
+        } else if (order.stationId > 0) {
+            stationDetailPage.openStation(order.stationId);
+            showPage(&stationDetailPage, theme::detailCanvasHeight);
+        }
+    });
+    QObject::connect(&navigationPage, &NavigationPage::backRequested,
+                     [&] {
+        showPage(&stationDetailPage, theme::detailCanvasHeight);
+    });
+    QObject::connect(&navigationPage, &NavigationPage::backToStationRequested,
+                     [&] {
+        showPage(&stationDetailPage, theme::detailCanvasHeight);
+    });
 
-    const QByteArray screenshotPath = settlementPreview
+    const QByteArray screenshotPath = navigationPreview
+        ? qgetenv("EV_NAVIGATION_SCREENSHOT_PATH")
+        : settlementPreview
         ? qgetenv("EV_SETTLEMENT_SCREENSHOT_PATH")
         : chargingPreview
         ? qgetenv("EV_CHARGING_SCREENSHOT_PATH")
@@ -238,7 +363,9 @@ int main(int argc, char* argv[])
         ? qgetenv("EV_HOME_SCREENSHOT_PATH")
         : qgetenv("EV_LOGIN_SCREENSHOT_PATH");
     if (!screenshotPath.isEmpty()) {
-        QWidget* screenshotWidget = settlementPreview
+        QWidget* screenshotWidget = navigationPreview
+            ? static_cast<QWidget*>(&navigationPage)
+            : settlementPreview
             ? static_cast<QWidget*>(&settlementPage)
             : chargingPreview
             ? static_cast<QWidget*>(&chargingPage)
@@ -247,10 +374,18 @@ int main(int argc, char* argv[])
             : homePreview
             ? static_cast<QWidget*>(&homePage)
             : static_cast<QWidget*>(&loginPage);
-        QTimer::singleShot(500, [screenshotWidget, screenshotPath, &app] {
+        const int screenshotDelay = navigationPreview ? 2500 : 500;
+        QTimer::singleShot(screenshotDelay, [screenshotWidget, screenshotPath, &app] {
             screenshotWidget->grab().save(QString::fromLocal8Bit(screenshotPath));
             app.quit();
         });
+    }
+
+    // 只在没有显式预览页面时恢复登录，避免预览截图被 QSettings 中的账号抢走。
+    const bool anyPreview = detailPreview || homePreview || chargingPreview ||
+                            settlementPreview || navigationPreview;
+    if (!anyPreview) {
+        QTimer::singleShot(0, &loginPage, &LoginPage::tryRestoreLogin);
     }
 
     return app.exec();

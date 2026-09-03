@@ -27,15 +27,16 @@ QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
 namespace {
 struct qt_meta_stringdata_LoginPage_t {
-    uint offsetsAndSizes[16];
+    uint offsetsAndSizes[18];
     char stringdata0[10];
     char stringdata1[15];
     char stringdata2[1];
-    char stringdata3[15];
-    char stringdata4[12];
-    char stringdata5[17];
-    char stringdata6[19];
-    char stringdata7[8];
+    char stringdata3[16];
+    char stringdata4[15];
+    char stringdata5[12];
+    char stringdata6[17];
+    char stringdata7[19];
+    char stringdata8[8];
 };
 #define QT_MOC_LITERAL(ofs, len) \
     uint(sizeof(qt_meta_stringdata_LoginPage_t::offsetsAndSizes) + ofs), len 
@@ -44,15 +45,17 @@ Q_CONSTINIT static const qt_meta_stringdata_LoginPage_t qt_meta_stringdata_Login
         QT_MOC_LITERAL(0, 9),  // "LoginPage"
         QT_MOC_LITERAL(10, 14),  // "loginSucceeded"
         QT_MOC_LITERAL(25, 0),  // ""
-        QT_MOC_LITERAL(26, 14),  // "onLoginClicked"
-        QT_MOC_LITERAL(41, 11),  // "onConnected"
-        QT_MOC_LITERAL(53, 16),  // "onTransportError"
-        QT_MOC_LITERAL(70, 18),  // "transportErrorCode"
-        QT_MOC_LITERAL(89, 7)   // "message"
+        QT_MOC_LITERAL(26, 15),  // "sessionRestored"
+        QT_MOC_LITERAL(42, 14),  // "onLoginClicked"
+        QT_MOC_LITERAL(57, 11),  // "onConnected"
+        QT_MOC_LITERAL(69, 16),  // "onTransportError"
+        QT_MOC_LITERAL(86, 18),  // "transportErrorCode"
+        QT_MOC_LITERAL(105, 7)   // "message"
     },
     "LoginPage",
     "loginSucceeded",
     "",
+    "sessionRestored",
     "onLoginClicked",
     "onConnected",
     "onTransportError",
@@ -68,28 +71,30 @@ Q_CONSTINIT static const uint qt_meta_data_LoginPage[] = {
       10,       // revision
        0,       // classname
        0,    0, // classinfo
-       4,   14, // methods
+       5,   14, // methods
        0,    0, // properties
        0,    0, // enums/sets
        0,    0, // constructors
        0,       // flags
-       1,       // signalCount
+       2,       // signalCount
 
  // signals: name, argc, parameters, tag, flags, initial metatype offsets
-       1,    0,   38,    2, 0x06,    1 /* Public */,
+       1,    0,   44,    2, 0x06,    1 /* Public */,
+       3,    0,   45,    2, 0x06,    2 /* Public */,
 
  // slots: name, argc, parameters, tag, flags, initial metatype offsets
-       3,    0,   39,    2, 0x08,    2 /* Private */,
-       4,    0,   40,    2, 0x08,    3 /* Private */,
-       5,    2,   41,    2, 0x08,    4 /* Private */,
+       4,    0,   46,    2, 0x08,    3 /* Private */,
+       5,    0,   47,    2, 0x08,    4 /* Private */,
+       6,    2,   48,    2, 0x08,    5 /* Private */,
 
  // signals: parameters
+    QMetaType::Void,
     QMetaType::Void,
 
  // slots: parameters
     QMetaType::Void,
     QMetaType::Void,
-    QMetaType::Void, QMetaType::Int, QMetaType::QString,    6,    7,
+    QMetaType::Void, QMetaType::Int, QMetaType::QString,    7,    8,
 
        0        // eod
 };
@@ -104,6 +109,8 @@ Q_CONSTINIT const QMetaObject LoginPage::staticMetaObject = { {
         // Q_OBJECT / Q_GADGET
         QtPrivate::TypeAndForceComplete<LoginPage, std::true_type>,
         // method 'loginSucceeded'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'sessionRestored'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
         // method 'onLoginClicked'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
@@ -124,9 +131,10 @@ void LoginPage::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, v
         (void)_t;
         switch (_id) {
         case 0: _t->loginSucceeded(); break;
-        case 1: _t->onLoginClicked(); break;
-        case 2: _t->onConnected(); break;
-        case 3: _t->onTransportError((*reinterpret_cast< std::add_pointer_t<int>>(_a[1])),(*reinterpret_cast< std::add_pointer_t<QString>>(_a[2]))); break;
+        case 1: _t->sessionRestored(); break;
+        case 2: _t->onLoginClicked(); break;
+        case 3: _t->onConnected(); break;
+        case 4: _t->onTransportError((*reinterpret_cast< std::add_pointer_t<int>>(_a[1])),(*reinterpret_cast< std::add_pointer_t<QString>>(_a[2]))); break;
         default: ;
         }
     } else if (_c == QMetaObject::IndexOfMethod) {
@@ -135,6 +143,13 @@ void LoginPage::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, v
             using _t = void (LoginPage::*)();
             if (_t _q_method = &LoginPage::loginSucceeded; *reinterpret_cast<_t *>(_a[1]) == _q_method) {
                 *result = 0;
+                return;
+            }
+        }
+        {
+            using _t = void (LoginPage::*)();
+            if (_t _q_method = &LoginPage::sessionRestored; *reinterpret_cast<_t *>(_a[1]) == _q_method) {
+                *result = 1;
                 return;
             }
         }
@@ -160,13 +175,13 @@ int LoginPage::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 4)
+        if (_id < 5)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 4;
+        _id -= 5;
     } else if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 4)
+        if (_id < 5)
             *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType();
-        _id -= 4;
+        _id -= 5;
     }
     return _id;
 }
@@ -175,6 +190,12 @@ int LoginPage::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
 void LoginPage::loginSucceeded()
 {
     QMetaObject::activate(this, &staticMetaObject, 0, nullptr);
+}
+
+// SIGNAL 1
+void LoginPage::sessionRestored()
+{
+    QMetaObject::activate(this, &staticMetaObject, 1, nullptr);
 }
 QT_WARNING_POP
 QT_END_MOC_NAMESPACE

@@ -6,6 +6,8 @@ user-client_autogen/timestamp: \
 	/mnt/d/User/Desktop/ev-charging/user-client/src/config/AppConfig.h \
 	/mnt/d/User/Desktop/ev-charging/user-client/src/geo/Geocoder.cpp \
 	/mnt/d/User/Desktop/ev-charging/user-client/src/geo/Geocoder.h \
+	/mnt/d/User/Desktop/ev-charging/user-client/src/geo/RoutePlanner.cpp \
+	/mnt/d/User/Desktop/ev-charging/user-client/src/geo/RoutePlanner.h \
 	/mnt/d/User/Desktop/ev-charging/user-client/src/main.cpp \
 	/mnt/d/User/Desktop/ev-charging/user-client/src/model/Order.h \
 	/mnt/d/User/Desktop/ev-charging/user-client/src/model/Station.h \
@@ -24,6 +26,12 @@ user-client_autogen/timestamp: \
 	/mnt/d/User/Desktop/ev-charging/user-client/src/ui/HomePage.h \
 	/mnt/d/User/Desktop/ev-charging/user-client/src/ui/LoginPage.cpp \
 	/mnt/d/User/Desktop/ev-charging/user-client/src/ui/LoginPage.h \
+	/mnt/d/User/Desktop/ev-charging/user-client/src/ui/NavigationPage.cpp \
+	/mnt/d/User/Desktop/ev-charging/user-client/src/ui/NavigationPage.h \
+	/mnt/d/User/Desktop/ev-charging/user-client/src/ui/OrderPage.cpp \
+	/mnt/d/User/Desktop/ev-charging/user-client/src/ui/OrderPage.h \
+	/mnt/d/User/Desktop/ev-charging/user-client/src/ui/ProfilePage.cpp \
+	/mnt/d/User/Desktop/ev-charging/user-client/src/ui/ProfilePage.h \
 	/mnt/d/User/Desktop/ev-charging/user-client/src/ui/SettlementPage.cpp \
 	/mnt/d/User/Desktop/ev-charging/user-client/src/ui/SettlementPage.h \
 	/mnt/d/User/Desktop/ev-charging/user-client/src/ui/StationCard.cpp \
@@ -320,6 +328,7 @@ user-client_autogen/timestamp: \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/QJsonObject \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/QList \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/QObject \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/QPointF \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/QString \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/QTimer \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/QtGlobal \

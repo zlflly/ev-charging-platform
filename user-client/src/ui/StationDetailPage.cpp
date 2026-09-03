@@ -8,6 +8,7 @@
 
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QIcon>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QLabel>
@@ -33,6 +34,19 @@ QString cssRgba(const QColor& color, int alpha)
 {
     return QStringLiteral("rgba(%1,%2,%3,%4)")
         .arg(color.red()).arg(color.green()).arg(color.blue()).arg(alpha);
+}
+
+QPixmap tintedSvgPixmap(const QString& resourcePath, const QSize& size,
+                        const QColor& color)
+{
+    const QPixmap source = QIcon(resourcePath).pixmap(size);
+    if (source.isNull()) return {};
+    QPixmap tinted(size);
+    tinted.fill(color);
+    QPainter painter(&tinted);
+    painter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+    painter.drawPixmap(0, 0, source);
+    return tinted;
 }
 
 QPainterPath starPath(const QPointF& center, qreal outerRadius, qreal innerRadius)
@@ -65,13 +79,13 @@ protected:
     {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setPen(QPen(theme::textPrimary(), 2.5, Qt::SolidLine,
-                            Qt::RoundCap, Qt::RoundJoin));
-        painter.drawLine(QPointF(23, height() / 2.0), QPointF(9, height() / 2.0));
-        painter.drawLine(QPointF(9, height() / 2.0),
-                         QPointF(20, height() / 2.0 - 11));
-        painter.drawLine(QPointF(9, height() / 2.0),
-                         QPointF(20, height() / 2.0 + 11));
+        const QPixmap icon = tintedSvgPixmap(
+            QStringLiteral(":/resources/icons/back.svg"), QSize(26, 26),
+            theme::textPrimary());
+        if (!icon.isNull()) {
+            painter.drawPixmap((width() - icon.width()) / 2,
+                               (height() - icon.height()) / 2, icon);
+        }
     }
 };
 
@@ -88,6 +102,14 @@ protected:
     {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing, true);
+        const QPixmap icon = tintedSvgPixmap(
+            QStringLiteral(":/resources/icons/station.svg"), QSize(25, 25),
+            theme::textPrimary());
+        if (!icon.isNull()) {
+            painter.drawPixmap((width() - icon.width()) / 2,
+                               (height() - icon.height()) / 2, icon);
+            return;
+        }
         const qreal cx = width() / 2.0;
         QPainterPath pin;
         pin.moveTo(cx, height() - 2);
@@ -119,6 +141,14 @@ protected:
     {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing, true);
+        const QPixmap icon = tintedSvgPixmap(
+            QStringLiteral(":/resources/icons/navigate.svg"), QSize(26, 26),
+            theme::primaryBlue());
+        if (!icon.isNull()) {
+            painter.drawPixmap((width() - icon.width()) / 2,
+                               (height() - icon.height()) / 2, icon);
+            return;
+        }
         QPainterPath arrow;
         arrow.moveTo(4, height() - 5);
         arrow.lineTo(width() - 4, 4);
@@ -144,6 +174,14 @@ protected:
     {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing, true);
+        const QPixmap icon = tintedSvgPixmap(
+            QStringLiteral(":/resources/icons/favorite.svg"), QSize(26, 26),
+            theme::primaryBlue());
+        if (!icon.isNull()) {
+            painter.drawPixmap((width() - icon.width()) / 2,
+                               (height() - icon.height()) / 2, icon);
+            return;
+        }
         painter.setPen(Qt::NoPen);
         painter.setBrush(theme::primaryBlue());
         painter.drawPath(starPath(QPointF(width() / 2.0, height() / 2.0),
@@ -180,18 +218,13 @@ protected:
 
         int textLeft = 10;
         if (lightning_) {
-            QPainterPath bolt;
-            bolt.moveTo(18, 5);
-            bolt.lineTo(11, 14);
-            bolt.lineTo(16, 14);
-            bolt.lineTo(13, height() - 4);
-            bolt.lineTo(23, 11);
-            bolt.lineTo(18, 11);
-            bolt.closeSubpath();
-            painter.setPen(Qt::NoPen);
-            painter.setBrush(theme::success());
-            painter.drawPath(bolt);
-            textLeft = 28;
+            const QPixmap chargeIcon = tintedSvgPixmap(
+                QStringLiteral(":/resources/icons/charge.svg"), QSize(18, 18),
+                theme::success());
+            if (!chargeIcon.isNull()) {
+                painter.drawPixmap(7, (height() - chargeIcon.height()) / 2, chargeIcon);
+                textLeft = 29;
+            }
         }
 
         QFont font(QStringLiteral("Microsoft YaHei UI"));
@@ -261,22 +294,21 @@ protected:
         if (kind_ == Kind::Favorite) {
             const QColor starColor = favorite_ ? theme::priceAmber()
                                                 : theme::textPrimary();
-            painter.setPen(QPen(starColor, 2.2, Qt::SolidLine,
-                                Qt::RoundCap, Qt::RoundJoin));
-            painter.setBrush(favorite_ ? starColor : Qt::NoBrush);
-            painter.drawPath(starPath(QPointF(iconX, centerY), 13, 5.5));
+            const QPixmap star = tintedSvgPixmap(
+                QStringLiteral(":/resources/icons/favorite.svg"), QSize(28, 28),
+                starColor);
+            if (!star.isNull()) {
+                painter.drawPixmap(qRound(iconX - star.width() / 2.0),
+                                   qRound(centerY - star.height() / 2.0), star);
+            }
         } else {
-            painter.setPen(Qt::NoPen);
-            painter.setBrush(theme::textPrimary());
-            painter.drawEllipse(QPointF(iconX, centerY), 11, 11);
-            QPainterPath arrow;
-            arrow.moveTo(iconX - 5, centerY - 4);
-            arrow.lineTo(iconX + 7, centerY - 7);
-            arrow.lineTo(iconX + 4, centerY + 5);
-            arrow.lineTo(iconX, centerY + 1);
-            arrow.closeSubpath();
-            painter.setBrush(theme::primaryBlue());
-            painter.drawPath(arrow);
+            const QPixmap navigate = tintedSvgPixmap(
+                QStringLiteral(":/resources/icons/navigate_button.svg"), QSize(24, 24),
+                theme::textPrimary());
+            if (!navigate.isNull()) {
+                painter.drawPixmap(qRound(iconX - navigate.width() / 2.0),
+                                   qRound(centerY - navigate.height() / 2.0), navigate);
+            }
         }
     }
 

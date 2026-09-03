@@ -27,8 +27,13 @@ class LoginPage : public QWidget
 public:
     explicit LoginPage(NetworkClient* networkClient, QWidget* parent = nullptr);
 
+    // 从 QSettings 恢复上次登录手机号；真正的用户信息仍由服务端返回。
+    void tryRestoreLogin();
+    void clearRememberedLogin();
+
 signals:
     void loginSucceeded();
+    void sessionRestored();
 
 private slots:
     void onLoginClicked();
@@ -54,5 +59,6 @@ private:
     QLabel* footerLabel_ = nullptr;
 
     bool awaitingLoginResponse_ = false;
+    bool restoringSession_ = false;
     QString pendingPhone_;
 };

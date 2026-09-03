@@ -229,6 +229,30 @@ src/geo/Geocoder.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/user-client.dir/build.make CMakeFiles/user-client.dir/src/geo/Geocoder.cpp.s
 .PHONY : src/geo/Geocoder.cpp.s
 
+src/geo/RoutePlanner.o: src/geo/RoutePlanner.cpp.o
+.PHONY : src/geo/RoutePlanner.o
+
+# target to build an object file
+src/geo/RoutePlanner.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/user-client.dir/build.make CMakeFiles/user-client.dir/src/geo/RoutePlanner.cpp.o
+.PHONY : src/geo/RoutePlanner.cpp.o
+
+src/geo/RoutePlanner.i: src/geo/RoutePlanner.cpp.i
+.PHONY : src/geo/RoutePlanner.i
+
+# target to preprocess a source file
+src/geo/RoutePlanner.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/user-client.dir/build.make CMakeFiles/user-client.dir/src/geo/RoutePlanner.cpp.i
+.PHONY : src/geo/RoutePlanner.cpp.i
+
+src/geo/RoutePlanner.s: src/geo/RoutePlanner.cpp.s
+.PHONY : src/geo/RoutePlanner.s
+
+# target to generate assembly for a file
+src/geo/RoutePlanner.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/user-client.dir/build.make CMakeFiles/user-client.dir/src/geo/RoutePlanner.cpp.s
+.PHONY : src/geo/RoutePlanner.cpp.s
+
 src/main.o: src/main.cpp.o
 .PHONY : src/main.o
 
@@ -421,6 +445,78 @@ src/ui/LoginPage.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/user-client.dir/build.make CMakeFiles/user-client.dir/src/ui/LoginPage.cpp.s
 .PHONY : src/ui/LoginPage.cpp.s
 
+src/ui/NavigationPage.o: src/ui/NavigationPage.cpp.o
+.PHONY : src/ui/NavigationPage.o
+
+# target to build an object file
+src/ui/NavigationPage.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/user-client.dir/build.make CMakeFiles/user-client.dir/src/ui/NavigationPage.cpp.o
+.PHONY : src/ui/NavigationPage.cpp.o
+
+src/ui/NavigationPage.i: src/ui/NavigationPage.cpp.i
+.PHONY : src/ui/NavigationPage.i
+
+# target to preprocess a source file
+src/ui/NavigationPage.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/user-client.dir/build.make CMakeFiles/user-client.dir/src/ui/NavigationPage.cpp.i
+.PHONY : src/ui/NavigationPage.cpp.i
+
+src/ui/NavigationPage.s: src/ui/NavigationPage.cpp.s
+.PHONY : src/ui/NavigationPage.s
+
+# target to generate assembly for a file
+src/ui/NavigationPage.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/user-client.dir/build.make CMakeFiles/user-client.dir/src/ui/NavigationPage.cpp.s
+.PHONY : src/ui/NavigationPage.cpp.s
+
+src/ui/OrderPage.o: src/ui/OrderPage.cpp.o
+.PHONY : src/ui/OrderPage.o
+
+# target to build an object file
+src/ui/OrderPage.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/user-client.dir/build.make CMakeFiles/user-client.dir/src/ui/OrderPage.cpp.o
+.PHONY : src/ui/OrderPage.cpp.o
+
+src/ui/OrderPage.i: src/ui/OrderPage.cpp.i
+.PHONY : src/ui/OrderPage.i
+
+# target to preprocess a source file
+src/ui/OrderPage.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/user-client.dir/build.make CMakeFiles/user-client.dir/src/ui/OrderPage.cpp.i
+.PHONY : src/ui/OrderPage.cpp.i
+
+src/ui/OrderPage.s: src/ui/OrderPage.cpp.s
+.PHONY : src/ui/OrderPage.s
+
+# target to generate assembly for a file
+src/ui/OrderPage.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/user-client.dir/build.make CMakeFiles/user-client.dir/src/ui/OrderPage.cpp.s
+.PHONY : src/ui/OrderPage.cpp.s
+
+src/ui/ProfilePage.o: src/ui/ProfilePage.cpp.o
+.PHONY : src/ui/ProfilePage.o
+
+# target to build an object file
+src/ui/ProfilePage.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/user-client.dir/build.make CMakeFiles/user-client.dir/src/ui/ProfilePage.cpp.o
+.PHONY : src/ui/ProfilePage.cpp.o
+
+src/ui/ProfilePage.i: src/ui/ProfilePage.cpp.i
+.PHONY : src/ui/ProfilePage.i
+
+# target to preprocess a source file
+src/ui/ProfilePage.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/user-client.dir/build.make CMakeFiles/user-client.dir/src/ui/ProfilePage.cpp.i
+.PHONY : src/ui/ProfilePage.cpp.i
+
+src/ui/ProfilePage.s: src/ui/ProfilePage.cpp.s
+.PHONY : src/ui/ProfilePage.s
+
+# target to generate assembly for a file
+src/ui/ProfilePage.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/user-client.dir/build.make CMakeFiles/user-client.dir/src/ui/ProfilePage.cpp.s
+.PHONY : src/ui/ProfilePage.cpp.s
+
 src/ui/SettlementPage.o: src/ui/SettlementPage.cpp.o
 .PHONY : src/ui/SettlementPage.o
 
@@ -536,6 +632,9 @@ help:
 	@echo "... src/geo/Geocoder.o"
 	@echo "... src/geo/Geocoder.i"
 	@echo "... src/geo/Geocoder.s"
+	@echo "... src/geo/RoutePlanner.o"
+	@echo "... src/geo/RoutePlanner.i"
+	@echo "... src/geo/RoutePlanner.s"
 	@echo "... src/main.o"
 	@echo "... src/main.i"
 	@echo "... src/main.s"
@@ -560,6 +659,15 @@ help:
 	@echo "... src/ui/LoginPage.o"
 	@echo "... src/ui/LoginPage.i"
 	@echo "... src/ui/LoginPage.s"
+	@echo "... src/ui/NavigationPage.o"
+	@echo "... src/ui/NavigationPage.i"
+	@echo "... src/ui/NavigationPage.s"
+	@echo "... src/ui/OrderPage.o"
+	@echo "... src/ui/OrderPage.i"
+	@echo "... src/ui/OrderPage.s"
+	@echo "... src/ui/ProfilePage.o"
+	@echo "... src/ui/ProfilePage.i"
+	@echo "... src/ui/ProfilePage.s"
 	@echo "... src/ui/SettlementPage.o"
 	@echo "... src/ui/SettlementPage.i"
 	@echo "... src/ui/SettlementPage.s"

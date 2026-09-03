@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>导航地图</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #06111f; overflow: hidden; }
+  #mapContainer { position: absolute; inset: 0; }
+  /* Keep the map in the same deep-blue cockpit language even when the
+     provider returns its default light tile theme (for example while a
+     custom theme is still warming up in the web view cache). */
+  .amap-layers { filter: brightness(.62) saturate(.92) contrast(1.08); }
+  .map-tint { position: absolute; inset: 0; pointer-events: none;
+    background: rgba(3, 16, 32, .68); z-index: 20; }
+  .amap-logo, .amap-copyright { opacity: 0.28 !important; }
+  .current-pin, .destination-pin { position: relative; width: 42px; height: 42px; }
+  .current-pin:before {
+    content: ""; position: absolute; left: 7px; top: 7px; width: 28px; height: 28px;
+    border-radius: 50%; background: #1f6fff; border: 3px solid #eef5ff;
+    box-shadow: 0 0 0 10px rgba(31,111,255,.22), 0 0 24px rgba(31,111,255,.9);
+  }
+  .current-pin:after {
+    content: ""; position: absolute; left: 16px; top: 12px; width: 0; height: 0;
+    border-left: 8px solid transparent; border-right: 8px solid transparent;
+    border-bottom: 17px solid #eef5ff; transform: rotate(18deg);
+  }
+  .destination-pin:before {
+    content: ""; position: absolute; left: 5px; top: 1px; width: 32px; height: 32px;
+    border-radius: 50%; background: #ff6268; border: 3px solid #fff1f2;
+    box-shadow: 0 0 0 8px rgba(255,98,104,.16), 0 0 24px rgba(255,98,104,.72);
+  }
+  .destination-pin:after {
+    content: ""; position: absolute; left: 16px; top: 31px; width: 10px; height: 10px;
+    background: #ff6268; transform: rotate(45deg); border-right: 2px solid #fff1f2;
+    border-bottom: 2px solid #fff1f2;
+  }
+  .destination-pin svg { position: absolute; z-index: 1; left: 13px; top: 9px; width: 17px; height: 17px; }
+  .destination-pin path { fill: white; }
+  .route-callout {
+    min-width: 160px; padding: 10px 13px; border-radius: 13px;
+    border: 1px solid rgba(83,133,188,.58); background: rgba(7,20,37,.95);
+    box-shadow: 0 10px 24px rgba(0,0,0,.30); color: #edf3ff;
+    font-family: "Microsoft YaHei", sans-serif; line-height: 1.35;
+  }
+  .route-callout strong { display: block; font-size: 16px; font-weight: 700; white-space: nowrap; }
+  .route-callout span { color: #8ea1be; font-size: 13px; }
+  .route-callout em { color: #4a9aff; font-style: normal; font-size: 14px; }
+</style>
+</head>
+<body>
+<div id="mapContainer"></div>
+<script>
+  window._AMapSecurityConfig = { securityJsCode: "__JS_API_SECRET__" };
+  var origin = [__ORIGIN_LNG__, __ORIGIN_LAT__];
+  var destination = [__DESTINATION_LNG__, __DESTINATION_LAT__];
+  var routePath = __ROUTE_PATH__;
+  var destinationName = __DESTINATION_NAME__;
+  var distanceText = "__DISTANCE_TEXT__";
+  var etaText = "__ETA_TEXT__";
+
+  function loadScript(src, onload, onerror) {
+    var script = document.createElement("script");
+    script.src = src; script.onload = onload; script.onerror = onerror;
+    document.head.appendChild(script);
+  }
+
+  function iconContent(kind) {
+    if (kind === "destination") {
+      return '<div class="destination-pin"><svg viewBox="0 0 24 24" aria-hidden="true">' +
+        '<path d="M14.5 2 5.4 13.5h6.2L10.2 22l8.5-11.3h-5.5L14.5 2Z"/></svg></div>';
+    }
+    return '<div class="current-pin"></div>';
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, function (character) {
+      return ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[character];
+    });
+  }
+
+  function initMap() {
+    if (typeof AMap === "undefined") return;
+    var map = new AMap.Map("mapContainer", {
+      zoom: 13, center: origin, viewMode: "2D", mapStyle: "amap://styles/darkblue",
+      features: ["bg", "road", "building", "point"],
+      zooms: [9, 19], pitch: 0, rotateEnable: false
+    });
+    map.setMapStyle("amap://styles/darkblue");
+    var startMarker = new AMap.Marker({ position: origin, anchor: "center", zIndex: 60, content: iconContent("current") });
+    var destinationMarker = new AMap.Marker({ position: destination, anchor: "bottom-center", zIndex: 61, content: iconContent("destination") });
+    var callout = new AMap.Marker({
+      position: destination, anchor: "right-bottom",
+      offset: new AMap.Pixel(-24, -34), zIndex: 62,
+      content: '<div class="route-callout"><strong>' + escapeHtml(destinationName) +
+        '</strong><span><em>' + escapeHtml(distanceText) + '</em>　|　' +
+        escapeHtml(etaText) + '</span></div>'
+    });
+    var glowLine = new AMap.Polyline({
+      path: routePath, strokeColor: "#0b63ff", strokeOpacity: .23, strokeWeight: 18,
+      lineJoin: "round", lineCap: "round", zIndex: 40
+    });
+    var routeLine = new AMap.Polyline({
+      path: routePath, strokeColor: "#1677ff", strokeOpacity: .98, strokeWeight: 7,
+      lineJoin: "round", lineCap: "round", showDir: true, zIndex: 41
+    });
+    map.add([glowLine, routeLine, startMarker, destinationMarker, callout]);
+    var tint = document.createElement("div");
+    tint.className = "map-tint";
+    document.getElementById("mapContainer").appendChild(tint);
+
+    function pointAtProgress(progress) {
+      if (!routePath || routePath.length === 0) return origin;
+      if (routePath.length === 1) return routePath[0];
+      var lengths = [], total = 0;
+      for (var i = 1; i < routePath.length; ++i) {
+        var dx = routePath[i][0] - routePath[i - 1][0];
+        var dy = routePath[i][1] - routePath[i - 1][1];
+        var length = Math.sqrt(dx * dx + dy * dy);
+        lengths.push(length); total += length;
+      }
+      var remaining = Math.max(0, Math.min(1, progress)) * total;
+      for (var j = 0; j < lengths.length; ++j) {
+        if (remaining <= lengths[j]) {
+          var ratio = lengths[j] === 0 ? 0 : remaining / lengths[j];
+          return [
+            routePath[j][0] + (routePath[j + 1][0] - routePath[j][0]) * ratio,
+            routePath[j][1] + (routePath[j + 1][1] - routePath[j][1]) * ratio
+          ];
+        }
+        remaining -= lengths[j];
+      }
+      return routePath[routePath.length - 1];
+    }
+
+    window.__navigationMap = {
+      setProgress: function (progress) { startMarker.setPosition(pointAtProgress(progress)); },
+      recenter: function () { map.setZoomAndCenter(13, startMarker.getPosition()); },
+      zoomIn: function () { map.zoomIn(); },
+      zoomOut: function () { map.zoomOut(); },
+      fit: function () { map.setFitView([glowLine, startMarker, destinationMarker], false, [40, 40, 80, 40]); },
+      setCalloutVisible: function (visible) { callout.setMap(visible ? map : null); }
+    };
+    map.on("complete", function () {
+      map.setMapStyle("amap://styles/darkblue");
+      window.__navigationMap.fit();
+    });
+  }
+
+  loadScript("https://webapi.amap.com/maps?v=2.0&key=__JS_API_KEY__", initMap, function () {
+    document.body.innerHTML = '<div style="color:#8a9ab5;font:14px sans-serif;padding:24px;text-align:center;">' +
+      "地图加载失败，请检查网络或 AMAP_JS_API_KEY" + '</div>';
+  });
+</script>
+</body>
+</html>
