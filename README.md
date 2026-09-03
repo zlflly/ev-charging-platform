@@ -1,6 +1,6 @@
 # EV Charging Platform - 数据分析与大屏模块
 
-**负责人**：成员四（ran）  
+**负责人**：韩嘉冉
 **分支**：`ran-dashboard-ml`  
 **模块**：数据可视化大屏（Web + ECharts）+ 机器学习负荷预测
 
