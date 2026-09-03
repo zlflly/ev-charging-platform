@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>附近地图</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #0a0f1d; overflow: hidden; }
+  #mapContainer { position: absolute; inset: 0; }
+  .amap-logo, .amap-copyright { opacity: 0.35 !important; }
+</style>
+</head>
+<body>
+<div id="mapContainer"></div>
+<script>
+  window._AMapSecurityConfig = { securityJsCode: "__JS_API_SECRET__" };
+  var mapCenter = { longitude: __CENTER_LNG__, latitude: __CENTER_LAT__ };
+
+  function loadScript(src, onload, onerror) {
+    var script = document.createElement("script");
+    script.src = src;
+    script.onload = onload;
+    script.onerror = onerror;
+    document.head.appendChild(script);
+  }
+
+  function initMap() {
+    if (typeof AMap === "undefined") return;
+    var map = new AMap.Map("mapContainer", {
+      zoom: 13,
+      center: [mapCenter.longitude, mapCenter.latitude],
+      viewMode: "2D",
+      mapStyle: "amap://styles/darkblue",
+      features: ["bg", "road", "building", "point"]
+    });
+    var marker = new AMap.Marker({
+      position: [mapCenter.longitude, mapCenter.latitude],
+      anchor: "bottom-center",
+      content: '<div style="width:18px;height:18px;border-radius:50% 50% 50% 4px;' +
+        'background:#1E8CFF;border:2px solid #fff;transform:rotate(45deg);' +
+        'box-shadow:0 0 0 8px rgba(30,140,255,0.22),0 6px 16px rgba(0,0,0,0.45);"></div>'
+    });
+    map.add(marker);
+    map.on("complete", function () {
+      map.setFitView([marker], false, [40, 40, 40, 40], 14);
+    });
+    window.__homeMap = map;
+    window.__homeMarker = marker;
+    window.setHomeCenter = function (lng, lat) {
+      var position = [lng, lat];
+      marker.setPosition(position);
+      map.setZoomAndCenter(13, position);
+    };
+  }
+
+  loadScript(
+    "https://webapi.amap.com/maps?v=2.0&key=__JS_API_KEY__",
+    initMap,
+    function () {
+      document.body.innerHTML =
+        '<div style="color:#9BB1C9;font:14px sans-serif;padding:24px;text-align:center;">' +
+        "地图加载失败，请检查网络或 AMAP_JS_API_KEY</div>";
+    }
+  );
+</script>
+</body>
+</html>

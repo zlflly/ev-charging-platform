@@ -1,0 +1,7 @@
+/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles/user-client.dir
+/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles/user-client_other_files.dir
+/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles/user-client_qmlimportscan.dir
+/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles/edit_cache.dir
+/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles/rebuild_cache.dir
+/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles/user-client_autogen_timestamp_deps.dir
+/mnt/d/User/Desktop/ev-charging/user-client/build/CMakeFiles/user-client_autogen.dir

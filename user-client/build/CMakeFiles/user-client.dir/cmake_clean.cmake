@@ -1,0 +1,43 @@
+file(REMOVE_RECURSE
+  ".rcc/qrc_app_resources.cpp"
+  "CMakeFiles/user-client_autogen.dir/AutogenUsed.txt"
+  "CMakeFiles/user-client_autogen.dir/ParseCache.txt"
+  "user-client_autogen"
+  "CMakeFiles/user-client.dir/build/.rcc/qrc_app_resources.cpp.o"
+  "CMakeFiles/user-client.dir/build/.rcc/qrc_app_resources.cpp.o.d"
+  "CMakeFiles/user-client.dir/src/geo/Geocoder.cpp.o"
+  "CMakeFiles/user-client.dir/src/geo/Geocoder.cpp.o.d"
+  "CMakeFiles/user-client.dir/src/main.cpp.o"
+  "CMakeFiles/user-client.dir/src/main.cpp.o.d"
+  "CMakeFiles/user-client.dir/src/net/NetworkClient.cpp.o"
+  "CMakeFiles/user-client.dir/src/net/NetworkClient.cpp.o.d"
+  "CMakeFiles/user-client.dir/src/session/Session.cpp.o"
+  "CMakeFiles/user-client.dir/src/session/Session.cpp.o.d"
+  "CMakeFiles/user-client.dir/src/ui/ChargerCard.cpp.o"
+  "CMakeFiles/user-client.dir/src/ui/ChargerCard.cpp.o.d"
+  "CMakeFiles/user-client.dir/src/ui/ChargingHeroWidget.cpp.o"
+  "CMakeFiles/user-client.dir/src/ui/ChargingHeroWidget.cpp.o.d"
+  "CMakeFiles/user-client.dir/src/ui/ChargingPage.cpp.o"
+  "CMakeFiles/user-client.dir/src/ui/ChargingPage.cpp.o.d"
+  "CMakeFiles/user-client.dir/src/ui/HomePage.cpp.o"
+  "CMakeFiles/user-client.dir/src/ui/HomePage.cpp.o.d"
+  "CMakeFiles/user-client.dir/src/ui/LoginPage.cpp.o"
+  "CMakeFiles/user-client.dir/src/ui/LoginPage.cpp.o.d"
+  "CMakeFiles/user-client.dir/src/ui/SettlementPage.cpp.o"
+  "CMakeFiles/user-client.dir/src/ui/SettlementPage.cpp.o.d"
+  "CMakeFiles/user-client.dir/src/ui/StationCard.cpp.o"
+  "CMakeFiles/user-client.dir/src/ui/StationCard.cpp.o.d"
+  "CMakeFiles/user-client.dir/src/ui/StationDetailPage.cpp.o"
+  "CMakeFiles/user-client.dir/src/ui/StationDetailPage.cpp.o.d"
+  "CMakeFiles/user-client.dir/user-client_autogen/mocs_compilation.cpp.o"
+  "CMakeFiles/user-client.dir/user-client_autogen/mocs_compilation.cpp.o.d"
+  "user-client"
+  "user-client.pdb"
+  "user-client_autogen/mocs_compilation.cpp"
+  "user-client_autogen/timestamp"
+)
+
+# Per-language clean rules from dependency scanning.
+foreach(lang CXX)
+  include(CMakeFiles/user-client.dir/cmake_clean_${lang}.cmake OPTIONAL)
+endforeach()

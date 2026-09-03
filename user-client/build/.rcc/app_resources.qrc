@@ -1,0 +1,9 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="resources/images/login_bg.png">/mnt/d/User/Desktop/ev-charging/user-client/resources/images/login_bg.png</file>
+    <file alias="resources/images/station_pile_generated.png">/mnt/d/User/Desktop/ev-charging/user-client/resources/images/station_pile_generated.png</file>
+    <file alias="resources/images/charging_bg.png">/mnt/d/User/Desktop/ev-charging/user-client/resources/images/charging_bg.png</file>
+    <file alias="resources/home-map.html">/mnt/d/User/Desktop/ev-charging/user-client/resources/home-map.html</file>
+  </qresource>
+</RCC>
+
