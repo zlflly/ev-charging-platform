@@ -1,0 +1,127 @@
+#include "protocol/Protocol.h"
+
+#include <QByteArray>
+#include <QCoreApplication>
+#include <QHash>
+#include <QHostAddress>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QPointer>
+#include <QTcpServer>
+#include <QTcpSocket>
+#include <QTimer>
+#include <QtEndian>
+
+#include <cstdio>
+#include <cstring>
+
+namespace {
+
+QByteArray makeFrame(const QJsonObject& object)
+{
+    const QByteArray payload = QJsonDocument(object).toJson(QJsonDocument::Compact);
+    const quint32 length = qToBigEndian<quint32>(static_cast<quint32>(payload.size()));
+    QByteArray frame;
+    frame.append(reinterpret_cast<const char*>(&length), protocol::kFrameLengthPrefixBytes);
+    frame.append(payload);
+    return frame;
+}
+
+class MockServer final : public QObject
+{
+public:
+    explicit MockServer(QObject* parent = nullptr)
+        : QObject(parent)
+    {
+        connect(&server_, &QTcpServer::newConnection, this, [this] {
+            while (auto* socket = server_.nextPendingConnection()) {
+                buffers_.insert(socket, QByteArray{});
+                connect(socket, &QTcpSocket::readyRead, this, [this, socket] {
+                    buffers_[socket].append(socket->readAll());
+                    process(socket);
+                });
+                connect(socket, &QTcpSocket::disconnected, this, [this, socket] {
+                    buffers_.remove(socket);
+                    socket->deleteLater();
+                });
+            }
+        });
+    }
+
+    bool listen()
+    {
+        return server_.listen(QHostAddress::LocalHost, 9000);
+    }
+
+private:
+    void process(QTcpSocket* socket)
+    {
+        QByteArray& buffer = buffers_[socket];
+        while (buffer.size() >= protocol::kFrameLengthPrefixBytes) {
+            quint32 payloadLength = 0;
+            std::memcpy(&payloadLength, buffer.constData(), protocol::kFrameLengthPrefixBytes);
+            payloadLength = qFromBigEndian<quint32>(payloadLength);
+            if (payloadLength > protocol::kMaxPayloadBytes) {
+                socket->abort();
+                return;
+            }
+            const qint64 frameSize = protocol::kFrameLengthPrefixBytes
+                + static_cast<qint64>(payloadLength);
+            if (buffer.size() < frameSize) {
+                return;
+            }
+            const QByteArray payload = buffer.mid(protocol::kFrameLengthPrefixBytes,
+                                                  payloadLength);
+            buffer.remove(0, static_cast<int>(frameSize));
+            handle(socket, QJsonDocument::fromJson(payload).object());
+        }
+    }
+
+    void handle(QTcpSocket* socket, const QJsonObject& request)
+    {
+        const QString requestId = request.value(QStringLiteral("requestId")).toString();
+        const QString action = request.value(QStringLiteral("action")).toString();
+        const QJsonObject requestData = request.value(QStringLiteral("data")).toObject();
+
+        QJsonObject response {
+            {QStringLiteral("requestId"), requestId},
+            {QStringLiteral("code"), protocol::CodeOk},
+            {QStringLiteral("message"), QStringLiteral("ok")},
+        };
+        if (action == QString::fromUtf8(protocol::action::kPing)) {
+            response.insert(QStringLiteral("data"), requestData);
+        } else {
+            response.insert(QStringLiteral("code"), 1001);
+            response.insert(QStringLiteral("message"), QStringLiteral("unsupported action"));
+        }
+
+        // 反向延迟 PING，强制客户端在乱序响应下按 requestId 匹配。
+        const QString echo = requestData.value(QStringLiteral("echo")).toString();
+        const int suffix = echo.right(1).toInt();
+        const int delayMs = echo.isEmpty() ? 0 : (5 - suffix) * 25;
+        const QPointer<QTcpSocket> guardedSocket(socket);
+        QTimer::singleShot(delayMs, this, [guardedSocket, response] {
+            if (guardedSocket) {
+                guardedSocket->write(makeFrame(response));
+            }
+        });
+    }
+
+    QTcpServer server_;
+    QHash<QTcpSocket*, QByteArray> buffers_;
+};
+
+} // namespace
+
+int main(int argc, char* argv[])
+{
+    QCoreApplication application(argc, argv);
+    MockServer server;
+    if (!server.listen()) {
+        std::fprintf(stderr, "failed to listen on 127.0.0.1:9000\n");
+        return 1;
+    }
+    std::printf("admin mock server listening on 127.0.0.1:9000\n");
+    std::fflush(stdout);
+    return application.exec();
+}
