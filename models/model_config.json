@@ -1,0 +1,49 @@
+{
+  "model_version": "v1.0",
+  "model_type": "DecisionTree",
+  "feature_cols": [
+    "hour",
+    "weekday",
+    "day_of_month",
+    "month",
+    "is_weekend",
+    "hour_sin",
+    "hour_cos",
+    "energy_lag_1",
+    "energy_lag_6",
+    "energy_lag_24",
+    "energy_rolling_mean_3",
+    "order_count",
+    "active_chargers"
+  ],
+  "train_date": "2026-09-03 22:43:50",
+  "train_samples": 770,
+  "test_samples": 193,
+  "metrics": {
+    "baseline_lag1": {
+      "model": "Baseline_Lag1",
+      "mae": 120.4,
+      "rmse": 162.5,
+      "mape": 122.71,
+      "r2": -0.9821,
+      "n_samples": 193
+    },
+    "baseline_lag24": {
+      "model": "Baseline_Lag24",
+      "mae": 123.48,
+      "rmse": 159.25,
+      "mape": 108.11,
+      "r2": -0.9036,
+      "n_samples": 193
+    },
+    "ml_model": {
+      "model": "DecisionTree",
+      "mae": 96.21,
+      "rmse": 128.51,
+      "mape": 89.19,
+      "r2": -0.2396,
+      "n_samples": 193
+    }
+  },
+  "best_model": "DecisionTree"
+}
