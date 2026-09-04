@@ -4,11 +4,13 @@
 #include <QMainWindow>
 
 class QLabel;
+class AdminApiClient;
 class NetworkClient;
 class AdminSession;
 class QPushButton;
 class QStackedWidget;
 class QWidget;
+class ChargerStatusOverviewWidget;
 
 class MainWindow final : public QMainWindow
 {
@@ -17,6 +19,7 @@ class MainWindow final : public QMainWindow
 public:
     explicit MainWindow(NetworkClient* network,
                         AdminSession* session,
+                        AdminApiClient* api,
                         QWidget* parent = nullptr);
 
 signals:
@@ -33,7 +36,8 @@ private:
     QWidget* createMetricCard(const QString& label,
                               const QString& value,
                               const QString& hint,
-                              const QString& accent);
+                              const QString& accent,
+                              QLabel** valueLabel = nullptr);
     QWidget* createSectionCard(const QString& title, QWidget* content);
     QWidget* createPlaceholderPanel(const QString& title,
                                     const QString& message,
@@ -49,6 +53,7 @@ private:
 
     NetworkClient* network_ = nullptr;
     AdminSession* session_ = nullptr;
+    AdminApiClient* api_ = nullptr;
     QStackedWidget* pages_ = nullptr;
     QLabel* pageTitle_ = nullptr;
     QLabel* pageSubtitle_ = nullptr;
@@ -56,6 +61,8 @@ private:
     QLabel* connectionBadge_ = nullptr;
     QLabel* adminNameLabel_ = nullptr;
     QLabel* adminAccountLabel_ = nullptr;
+    QLabel* chargerTotalLabel_ = nullptr;
+    ChargerStatusOverviewWidget* chargerOverviewWidget_ = nullptr;
     QPushButton* connectionButton_ = nullptr;
     QList<QPushButton*> navigationButtons_;
 };

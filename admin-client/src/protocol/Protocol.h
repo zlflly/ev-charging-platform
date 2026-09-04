@@ -12,11 +12,20 @@ namespace protocol {
 namespace action {
 inline constexpr const char* kPing = "PING";
 inline constexpr const char* kAdminLogin = "admin.login";
+inline constexpr const char* kAdminChargerOverview = "admin.charger.overview";
 } // namespace action
 
 inline constexpr int kFrameLengthPrefixBytes = 4;
 inline constexpr qint64 kMaxPayloadBytes = 16 * 1024 * 1024;
 inline constexpr int kDefaultRequestTimeoutMs = 10 * 1000;
+
+// 与用户端保持一致；聚合接口使用具名字段，后续单桩列表按此枚举解析。
+enum ChargerStatus {
+    ChargerStatusIdle = 0,
+    ChargerStatusCharging = 1,
+    ChargerStatusFault = 2,
+    ChargerStatusOffline = 3,
+};
 
 enum ErrorCode {
     CodeOk = 0,

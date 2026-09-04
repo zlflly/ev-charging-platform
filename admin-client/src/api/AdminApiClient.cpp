@@ -75,6 +75,47 @@ bool AdminApiClient::isLoginInFlight() const
     return loginInFlight_;
 }
 
+bool AdminApiClient::requestChargerOverview(ChargerOverviewCallback callback)
+{
+    if (chargerOverviewInFlight_) {
+        return false;
+    }
+
+    chargerOverviewInFlight_ = true;
+    sendAuthenticated(
+        QString::fromUtf8(protocol::action::kAdminChargerOverview), {},
+        [this, callback = std::move(callback)](const protocol::Response& response) {
+            chargerOverviewInFlight_ = false;
+            if (!response.isOk()) {
+                if (callback) {
+                    callback(std::nullopt,
+                             protocol::describeError(response.code, response.message));
+                }
+                return;
+            }
+
+            ChargerStatusOverview overview;
+            QString parseError;
+            if (!ChargerStatusOverview::fromJson(response.data, &overview, &parseError)) {
+                if (callback) {
+                    callback(std::nullopt,
+                             QStringLiteral("充电桩状态数据异常：%1").arg(parseError));
+                }
+                return;
+            }
+
+            if (callback) {
+                callback(overview, {});
+            }
+        });
+    return true;
+}
+
+bool AdminApiClient::isChargerOverviewInFlight() const
+{
+    return chargerOverviewInFlight_;
+}
+
 QString AdminApiClient::sendAuthenticated(const QString& action,
                                           const QJsonObject& data,
                                           NetworkClient::ResponseCallback callback,

@@ -2,6 +2,7 @@
 
 #include <QByteArray>
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QHash>
 #include <QHostAddress>
 #include <QJsonDocument>
@@ -113,6 +114,28 @@ private:
                     {QStringLiteral("adminId"), 1},
                     {QStringLiteral("account"), QStringLiteral("admin")},
                     {QStringLiteral("displayName"), QStringLiteral("系统管理员")},
+                });
+            }
+        } else if (action == QString::fromUtf8(
+                       protocol::action::kAdminChargerOverview)) {
+            if (adminIds_.value(socket) <= 0) {
+                response.insert(QStringLiteral("code"), protocol::CodeNotLoggedIn);
+                response.insert(QStringLiteral("message"),
+                                QStringLiteral("administrator login required"));
+            } else {
+                // 仅用于客户端联调；真实数量和占比必须由成员 1 的服务端聚合。
+                response.insert(QStringLiteral("data"), QJsonObject {
+                    {QStringLiteral("total"), 12},
+                    {QStringLiteral("idle"), 6},
+                    {QStringLiteral("charging"), 3},
+                    {QStringLiteral("fault"), 2},
+                    {QStringLiteral("offline"), 1},
+                    {QStringLiteral("idlePercent"), 50.0},
+                    {QStringLiteral("chargingPercent"), 25.0},
+                    {QStringLiteral("faultPercent"), 16.7},
+                    {QStringLiteral("offlinePercent"), 8.3},
+                    {QStringLiteral("updatedAt"),
+                     QDateTime::currentMSecsSinceEpoch()},
                 });
             }
         } else {

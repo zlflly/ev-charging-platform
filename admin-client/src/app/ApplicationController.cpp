@@ -12,7 +12,7 @@ ApplicationController::ApplicationController(QObject* parent)
     , session_(new AdminSession(this))
     , api_(new AdminApiClient(network_, session_, this))
     , loginWindow_(new LoginWindow(api_))
-    , mainWindow_(new MainWindow(network_, session_))
+    , mainWindow_(new MainWindow(network_, session_, api_))
 {
     connect(api_, &AdminApiClient::loginSucceeded,
             this, &ApplicationController::showMainWindow);
