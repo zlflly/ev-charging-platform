@@ -83,11 +83,11 @@ QString statusText(const Charger& charger)
 QColor statusColor(int status)
 {
     switch (status) {
-    case protocol::ChargerStatusIdle:     return QColor(QStringLiteral("#38E6A5"));
-    case protocol::ChargerStatusCharging: return QColor(QStringLiteral("#48C8FF"));
-    case protocol::ChargerStatusFault:    return QColor(QStringLiteral("#FF6268"));
-    case protocol::ChargerStatusOffline:  return QColor(QStringLiteral("#8DA8C0"));
-    default:                              return QColor(QStringLiteral("#FFC04D"));
+    case protocol::ChargerStatusIdle:     return QColor(QStringLiteral("#14865A"));
+    case protocol::ChargerStatusCharging: return QColor(QStringLiteral("#1769E8"));
+    case protocol::ChargerStatusFault:    return QColor(QStringLiteral("#C43742"));
+    case protocol::ChargerStatusOffline:  return QColor(QStringLiteral("#718399"));
+    default:                              return QColor(QStringLiteral("#A66C00"));
     }
 }
 
@@ -625,7 +625,7 @@ void ChargerManagementPage::setLoading(bool loading)
     resetFilterButton_->setEnabled(!loading);
     if (loading) {
         stateLabel_->setText(QStringLiteral("正在同步服务端设备状态"));
-        stateLabel_->setStyleSheet(QStringLiteral("color:#FFC04D;"));
+        stateLabel_->setStyleSheet(QStringLiteral("color:#A66C00;"));
         restartButton_->setEnabled(false);
         statusButton_->setEnabled(false);
     }
@@ -647,7 +647,7 @@ void ChargerManagementPage::showError(const QString& message)
     statusButton_->setEnabled(false);
     stateLabel_->setText(message.isEmpty()
         ? QStringLiteral("充电桩列表加载失败") : message);
-    stateLabel_->setStyleSheet(QStringLiteral("color:#FF7D87;"));
+    stateLabel_->setStyleSheet(QStringLiteral("color:#C43742;"));
     table_->setState(EntityTableView::State::Error, stateLabel_->text());
 }
 
@@ -668,7 +668,7 @@ void ChargerManagementPage::showChargers(const QList<Charger>& chargers)
     applyFilters();
     stateLabel_->setText(QStringLiteral("已同步 %1 台设备 · 筛选只改变当前视图")
                              .arg(chargers.size()));
-    stateLabel_->setStyleSheet(QStringLiteral("color:#38E6A5;"));
+    stateLabel_->setStyleSheet(QStringLiteral("color:#14865A;"));
 }
 
 void ChargerManagementPage::populateStationFilter()
@@ -719,7 +719,7 @@ void ChargerManagementPage::applyFilters()
         QList<EntityTableView::CellStyle> styles;
         if (charger.status == protocol::ChargerStatusFault) {
             for (int column = 0; column < 7; ++column) {
-                styles.append({column, {}, QColor(QStringLiteral("#28151D")), false});
+                styles.append({column, {}, QColor(QStringLiteral("#FFF0F1")), false});
             }
         }
         styles.append({4, statusColor(charger.status), {}, true});

@@ -1,6 +1,6 @@
 # EV Charging Platform - Admin Client
 
-Linux + Qt 6 管理员桌面客户端。当前已完成 Commit 4：
+Linux + Qt 6 管理员桌面客户端。当前已完成 Commit 5：
 
 - 宽屏后台主框架与统一导航；
 - 单例式共享 `NetworkClient`，采用 4 字节大端长度前缀 + UTF-8 JSON；
@@ -34,6 +34,21 @@ Linux + Qt 6 管理员桌面客户端。当前已完成 Commit 4：
 - 支持编辑站名、地址、经纬度和站点级电价，使用服务端 `version` 乐观锁避免并发覆盖；
 - 站内设备可直接执行受控状态调整和远程重启，成功后同步刷新详情和在线率；
 - 不允许编辑派生的总桩数/在线率，也不提供语义未冻结的级联删除。
+- 用户列表采用服务端分页，展示稳定 userId、手机号、昵称、两位小数余额、注册时间
+  和明确状态标签；支持手机号模糊查询与正常/冻结状态筛选；
+- 搜索只在点击、回车或翻页时发送，空关键字返回全部，无结果显示明确空状态；
+- 冻结/解冻携带 `expectedStatus` 和必填原因，服务端决定活跃订单规则；客户端不
+  乐观改行，响应后重查并以最新状态更新按钮。
+- 账号状态与业务状态分列展示；未完成订单显示已预约/充电中/待支付，以及关联
+  站点、充电桩和订单号，并支持服务端“有未完成订单/当前无订单”筛选；
+- `WAIT_SETTLEMENT` 与用户端统一显示为“待支付”：充电已停止、账单已生成，但
+  扣款与订单完结尚未成功；它仍属于服务端定义的未完成订单；
+- 冻结未完成订单用户采用“风险说明 → 原因填写”两阶段确认，服务端拒绝原因使用
+  高对比结果弹窗展示；服务端在写入时仍须复查，客户端不绕过订单保护；
+- Mock 对已预约、充电中和待支付三类未完成订单统一拒绝冻结，测试同时覆盖充电中
+  与待支付，避免按样例用户 ID 写死业务规则；
+- 全局视觉改为浅灰背景、白色圆角卡片、深蓝正文和蓝色主按钮，和用户端保持同一
+  产品语言，同时保留管理端侧栏、表格和信息密度。
 
 管理员协议见 `docs/admin-protocol.md`。默认 `admin/123456` 仅由数据库或 mock
 server 提供，客户端不在本地判断账号密码。
@@ -119,6 +134,18 @@ cmake --build build -j
 保护，以及状态变化后站点在线率同步；看到 `STATION OPERATIONS SMOKE TEST PASSED`
 表示增强运维链路通过。
 
+## User management smoke test
+
+保持 mock server 运行，在另一终端执行：
+
+```bash
+./build/admin-user-management-smoke-test
+```
+
+测试覆盖分页元数据、服务端手机号/使用状态筛选、活跃订单及设备字段、空结果、
+冻结后重查、旧状态并发拒绝、解冻，以及活跃订单拒绝原因透传；看到
+`USER MANAGEMENT SMOKE TEST PASSED` 表示 Commit 5 客户端闭环通过。
+
 ## Structure
 
 ```text
@@ -127,11 +154,13 @@ src/api/AdminApiClient           登录及后续认证请求的统一入口
 src/model/ChargerStatusOverview  聚合响应 DTO 与一致性校验
 src/model/Charger                桩列表 DTO、字段校验和状态/类型显示映射
 src/model/Station                站点、详情、新增和版本化编辑请求的协议校验
+src/model/User                   用户分页、金额时间与冻结状态协议校验
 src/session/AdminSession         管理员登录态唯一来源
 src/net/NetworkClient            TCP framing、超时和 requestId 匹配
 src/ui/LoginWindow               登录表单和交互状态
 src/ui/MainWindow                认证后的运营后台
 src/ui/ChargerManagementPage     列表、选择、二次确认和重启反馈
 src/ui/StationManagementPage     站点列表、详情、新增、编辑与站内设备运维
+src/ui/UserManagementPage        服务端搜索、分页和冻结/解冻风险控制
 src/ui/widgets/ChargerStatusOverviewWidget  状态卡片、进度条与刷新反馈
 ```

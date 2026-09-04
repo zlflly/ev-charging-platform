@@ -63,16 +63,16 @@ ChargerStatusOverviewWidget::ChargerStatusOverviewWidget(AdminApiClient* api,
     cards->setHorizontalSpacing(12);
     cards->addWidget(createStatusCard(0, QStringLiteral("闲置"),
                                       QStringLiteral("可预约或开始充电"),
-                                      QStringLiteral("#38E6A5")), 0, 0);
+                                      QStringLiteral("#14865A")), 0, 0);
     cards->addWidget(createStatusCard(1, QStringLiteral("在用"),
                                       QStringLiteral("已预约或正在充电"),
-                                      QStringLiteral("#48C8FF")), 0, 1);
+                                      QStringLiteral("#1769E8")), 0, 1);
     cards->addWidget(createStatusCard(2, QStringLiteral("故障"),
                                       QStringLiteral("需要运维处理"),
-                                      QStringLiteral("#FF6268")), 0, 2);
+                                      QStringLiteral("#C43742")), 0, 2);
     cards->addWidget(createStatusCard(3, QStringLiteral("离线"),
                                       QStringLiteral("未连接平台"),
-                                      QStringLiteral("#8DA8C0")), 0, 3);
+                                      QStringLiteral("#718399")), 0, 3);
     for (int column = 0; column < 4; ++column) {
         cards->setColumnStretch(column, 1);
     }
@@ -88,7 +88,7 @@ QWidget* ChargerStatusOverviewWidget::createStatusCard(int index,
     card->setObjectName(QStringLiteral("statusCard"));
     card->setMinimumHeight(132);
     card->setStyleSheet(QStringLiteral(
-        "QFrame#statusCard { background:#091725; border:1px solid #183A55;"
+        "QFrame#statusCard { background:#FFFFFF; border:1px solid #DCE5EE;"
         " border-radius:11px; }"));
 
     auto* layout = new QVBoxLayout(card);
@@ -115,7 +115,7 @@ QWidget* ChargerStatusOverviewWidget::createStatusCard(int index,
     statuses_.at(index).progress->setTextVisible(false);
     statuses_.at(index).progress->setFixedHeight(6);
     statuses_.at(index).progress->setStyleSheet(QStringLiteral(
-        "QProgressBar { background:#102438; border:0; border-radius:3px; }"
+        "QProgressBar { background:#E6EDF4; border:0; border-radius:3px; }"
         "QProgressBar::chunk { background:%1; border-radius:3px; }").arg(accent));
     layout->addWidget(statuses_.at(index).progress);
     layout->addWidget(makeLabel(hint, QStringLiteral("metricHint"), card));
@@ -155,7 +155,7 @@ void ChargerStatusOverviewWidget::setLoading(bool loading)
                                     : QStringLiteral("刷新状态"));
     if (loading) {
         stateLabel_->setText(QStringLiteral("正在获取服务端聚合数据，请稍候"));
-        stateLabel_->setStyleSheet(QStringLiteral("color:#FFC04D;"));
+        stateLabel_->setStyleSheet(QStringLiteral("color:#A66C00;"));
     }
 }
 
@@ -164,7 +164,7 @@ void ChargerStatusOverviewWidget::showError(const QString& message)
     stateLabel_->setText(message.isEmpty()
         ? QStringLiteral("状态加载失败，请稍后重试")
         : message);
-    stateLabel_->setStyleSheet(QStringLiteral("color:#FF7D87;"));
+    stateLabel_->setStyleSheet(QStringLiteral("color:#C43742;"));
 }
 
 void ChargerStatusOverviewWidget::showOverview(const ChargerStatusOverview& overview)
@@ -186,6 +186,6 @@ void ChargerStatusOverviewWidget::showOverview(const ChargerStatusOverview& over
               .toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"))
         : QStringLiteral("服务端未提供更新时间");
     stateLabel_->setText(QStringLiteral("数据更新时间：%1").arg(updatedText));
-    stateLabel_->setStyleSheet(QStringLiteral("color:#38E6A5;"));
+    stateLabel_->setStyleSheet(QStringLiteral("color:#14865A;"));
     emit overviewUpdated(overview.total);
 }

@@ -3,6 +3,7 @@
 #include "model/ChargerStatusOverview.h"
 #include "model/Charger.h"
 #include "model/Station.h"
+#include "model/User.h"
 #include "net/NetworkClient.h"
 
 #include <QJsonObject>
@@ -43,6 +44,12 @@ public:
     using ChargerStatusUpdateCallback = std::function<void(
         std::optional<ChargerStatusUpdateResult> result,
         const QString& errorMessage)>;
+    using UserListCallback = std::function<void(
+        std::optional<UserListPage> page,
+        const QString& errorMessage)>;
+    using UserStatusUpdateCallback = std::function<void(
+        std::optional<UserStatusUpdateResult> result,
+        const QString& errorMessage)>;
 
     explicit AdminApiClient(NetworkClient* network,
                             AdminSession* session,
@@ -70,6 +77,11 @@ public:
     bool updateChargerStatus(const ChargerStatusUpdateRequest& request,
                              ChargerStatusUpdateCallback callback);
     bool isChargerStatusUpdateInFlight() const;
+    bool requestUsers(const UserListQuery& query, UserListCallback callback);
+    bool isUserListInFlight() const;
+    bool updateUserStatus(const UserStatusUpdateRequest& request,
+                          UserStatusUpdateCallback callback);
+    bool isUserStatusUpdateInFlight() const;
 
     QString sendAuthenticated(const QString& action,
                               const QJsonObject& data,
@@ -97,6 +109,8 @@ private:
     bool stationCreateInFlight_ = false;
     bool stationUpdateInFlight_ = false;
     bool chargerStatusUpdateInFlight_ = false;
+    bool userListInFlight_ = false;
+    bool userStatusUpdateInFlight_ = false;
     QString pendingAccount_;
     QString pendingPassword_;
 };

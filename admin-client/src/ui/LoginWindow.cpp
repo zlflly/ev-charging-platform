@@ -51,7 +51,7 @@ QLabel* makeFeatureTag(const QString& text, QWidget* parent)
     auto* label = new QLabel(text, parent);
     label->setAlignment(Qt::AlignCenter);
     label->setStyleSheet(QStringLiteral(
-        "color:#A8C2D8; background:#0B1B2A; border:1px solid #24425E;"
+        "color:#24527F; background:#EEF5FF; border:1px solid #CFE0F5;"
         "border-radius:10px; padding:7px 12px; font-size:12px;"));
     return label;
 }
@@ -76,7 +76,7 @@ LoginWindow::LoginWindow(AdminApiClient* api, QWidget* parent)
     eyebrow->setObjectName(QStringLiteral("eyebrow"));
     auto* title = new QLabel(QStringLiteral("让每一座充电站\n保持清晰、可靠、可控"), this);
     title->setStyleSheet(QStringLiteral(
-        "font-size: 36px; font-weight: 750; color: #F4F8FC;"));
+        "font-size: 36px; font-weight: 750; color: #10233F;"));
     auto* description = new QLabel(
         QStringLiteral("统一查看设备健康、站点运营、用户状态与营收数据。"), this);
     description->setObjectName(QStringLiteral("pageSubtitle"));
@@ -198,7 +198,7 @@ void LoginWindow::showMessage(const QString& message, bool error)
 {
     messageLabel_->setText(message);
     messageLabel_->setStyleSheet(error
-        ? QStringLiteral("color:#FF7D87;")
-        : QStringLiteral("color:#48C8FF;"));
+        ? QStringLiteral("color:#C43742;")
+        : QStringLiteral("color:#1769E8;"));
     messageLabel_->show();
 }

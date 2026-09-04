@@ -7,6 +7,7 @@
 #include "session/AdminSession.h"
 #include "ui/ChargerManagementPage.h"
 #include "ui/StationManagementPage.h"
+#include "ui/UserManagementPage.h"
 #include "ui/theme/Theme.h"
 #include "ui/widgets/ChargerStatusOverviewWidget.h"
 #include "ui/widgets/EntityTableView.h"
@@ -88,7 +89,8 @@ MainWindow::MainWindow(NetworkClient* network,
     pages_->addWidget(chargerManagementPage_);
     stationManagementPage_ = new StationManagementPage(api_, pages_);
     pages_->addWidget(stationManagementPage_);
-    pages_->addWidget(createUserPage());
+    userManagementPage_ = new UserManagementPage(api_, pages_);
+    pages_->addWidget(userManagementPage_);
     pages_->addWidget(createRevenuePage());
     workspaceLayout->addWidget(pages_, 1);
     rootLayout->addWidget(workspace, 1);
@@ -164,7 +166,7 @@ QWidget* MainWindow::createSidebar()
 
     auto* divider = new QFrame(sidebar);
     divider->setFixedHeight(1);
-    divider->setStyleSheet(QStringLiteral("background:#18344E;"));
+    divider->setStyleSheet(QStringLiteral("background:#DCE5EE;"));
     layout->addWidget(divider);
 
     auto* admin = new QWidget(sidebar);
@@ -234,13 +236,13 @@ QWidget* MainWindow::createOverviewPage()
     layout->setVerticalSpacing(14);
 
     layout->addWidget(createMetricCard(QStringLiteral("今日营收"), QStringLiteral("¥ --"),
-                                       QStringLiteral("等待统计接口"), QStringLiteral("#38E6A5")), 0, 0);
+                                       QStringLiteral("等待统计接口"), QStringLiteral("#14865A")), 0, 0);
     layout->addWidget(createMetricCard(QStringLiteral("本月营收"), QStringLiteral("¥ --"),
-                                       QStringLiteral("等待统计接口"), QStringLiteral("#48C8FF")), 0, 1);
+                                       QStringLiteral("等待统计接口"), QStringLiteral("#1769E8")), 0, 1);
     layout->addWidget(createMetricCard(QStringLiteral("累计营收"), QStringLiteral("¥ --"),
                                        QStringLiteral("等待统计接口"), QStringLiteral("#9C8CFF")), 0, 2);
     layout->addWidget(createMetricCard(QStringLiteral("运营站点"), QStringLiteral("--"),
-                                       QStringLiteral("等待站点接口"), QStringLiteral("#FFC04D")), 0, 3);
+                                       QStringLiteral("等待站点接口"), QStringLiteral("#A66C00")), 0, 3);
     layout->addWidget(createMetricCard(QStringLiteral("充电桩总数"), QStringLiteral("--"),
                                        QStringLiteral("服务端实时聚合"), QStringLiteral("#2AD4D9"),
                                        &chargerTotalLabel_), 0, 4);
@@ -261,7 +263,7 @@ QWidget* MainWindow::createOverviewPage()
     auto* trend = createPlaceholderPanel(
         QStringLiteral("营收趋势 · 最近 7 日"),
         QStringLiteral("QChart 数据视图将在营收统计节点接入\n当前不展示任何模拟收入"),
-        QStringLiteral("#48C8FF"));
+        QStringLiteral("#1769E8"));
     layout->addWidget(createSectionCard(QStringLiteral("销售业绩"), trend), 2, 0, 1, 4);
 
     auto* faultTable = new EntityTableView(
@@ -278,21 +280,6 @@ QWidget* MainWindow::createOverviewPage()
     return page;
 }
 
-QWidget* MainWindow::createUserPage()
-{
-    auto* table = new EntityTableView(
-        {QStringLiteral("用户 ID"), QStringLiteral("手机号"), QStringLiteral("昵称"),
-         QStringLiteral("余额"), QStringLiteral("注册时间"), QStringLiteral("状态"),
-         QStringLiteral("操作")}, this);
-    auto* page = new QWidget(this);
-    page->setObjectName(QStringLiteral("pageRoot"));
-    auto* layout = new QVBoxLayout(page);
-    layout->setContentsMargins(theme::kPageMargin, 20,
-                               theme::kPageMargin, theme::kPageMargin);
-    layout->addWidget(createSectionCard(QStringLiteral("平台用户"), table));
-    return page;
-}
-
 QWidget* MainWindow::createRevenuePage()
 {
     auto* page = new QWidget(this);
@@ -302,9 +289,9 @@ QWidget* MainWindow::createRevenuePage()
                                theme::kPageMargin, theme::kPageMargin);
     layout->setSpacing(14);
     layout->addWidget(createMetricCard(QStringLiteral("今日营收"), QStringLiteral("¥ --"),
-                                       QStringLiteral("已结算订单口径待冻结"), QStringLiteral("#38E6A5")), 0, 0);
+                                       QStringLiteral("已结算订单口径待冻结"), QStringLiteral("#14865A")), 0, 0);
     layout->addWidget(createMetricCard(QStringLiteral("本月营收"), QStringLiteral("¥ --"),
-                                       QStringLiteral("已结算订单口径待冻结"), QStringLiteral("#48C8FF")), 0, 1);
+                                       QStringLiteral("已结算订单口径待冻结"), QStringLiteral("#1769E8")), 0, 1);
     layout->addWidget(createMetricCard(QStringLiteral("累计营收"), QStringLiteral("¥ --"),
                                        QStringLiteral("已结算订单口径待冻结"), QStringLiteral("#9C8CFF")), 0, 2);
     layout->addWidget(createSectionCard(
@@ -312,7 +299,7 @@ QWidget* MainWindow::createRevenuePage()
                           createPlaceholderPanel(
                               QStringLiteral("等待营收序列接口"),
                               QStringLiteral("缺失日期补零与迟到响应保护将在业务节点完成"),
-                              QStringLiteral("#48C8FF"))),
+                              QStringLiteral("#1769E8"))),
                       1, 0, 1, 3);
     layout->setRowStretch(1, 1);
     return page;
@@ -406,6 +393,9 @@ void MainWindow::switchPage(int pageIndex)
     }
     if (pageIndex == 2 && session_->isAuthenticated() && stationManagementPage_) {
         stationManagementPage_->refresh();
+    }
+    if (pageIndex == 3 && session_->isAuthenticated() && userManagementPage_) {
+        userManagementPage_->refresh();
     }
 }
 

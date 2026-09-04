@@ -498,6 +498,102 @@ bool AdminApiClient::isChargerStatusUpdateInFlight() const
     return chargerStatusUpdateInFlight_;
 }
 
+bool AdminApiClient::requestUsers(const UserListQuery& query,
+                                  UserListCallback callback)
+{
+    if (userListInFlight_ || userStatusUpdateInFlight_) {
+        return false;
+    }
+    QString validationError;
+    if (!query.validate(&validationError)) {
+        if (callback) callback(std::nullopt, validationError);
+        return false;
+    }
+    userListInFlight_ = true;
+    sendAuthenticated(
+        QString::fromUtf8(protocol::action::kAdminUserList), query.toJson(),
+        [this, query, callback = std::move(callback)](
+            const protocol::Response& response) {
+            userListInFlight_ = false;
+            if (!response.isOk()) {
+                if (callback) {
+                    callback(std::nullopt,
+                             protocol::describeError(response.code, response.message));
+                }
+                return;
+            }
+            UserListPage page;
+            QString parseError;
+            if (!UserListPage::fromJson(response.data, query, &page, &parseError)) {
+                if (callback) {
+                    callback(std::nullopt,
+                             QStringLiteral("用户列表数据异常：%1").arg(parseError));
+                }
+                return;
+            }
+            if (callback) callback(page, {});
+        });
+    return true;
+}
+
+bool AdminApiClient::isUserListInFlight() const
+{
+    return userListInFlight_;
+}
+
+bool AdminApiClient::updateUserStatus(const UserStatusUpdateRequest& request,
+                                      UserStatusUpdateCallback callback)
+{
+    if (userStatusUpdateInFlight_ || userListInFlight_) {
+        return false;
+    }
+    QString validationError;
+    if (!request.validate(&validationError)) {
+        if (callback) callback(std::nullopt, validationError);
+        return false;
+    }
+    userStatusUpdateInFlight_ = true;
+    sendAuthenticated(
+        QString::fromUtf8(protocol::action::kAdminUserFreeze), request.toJson(),
+        [this, request, callback = std::move(callback)](
+            const protocol::Response& response) {
+            userStatusUpdateInFlight_ = false;
+            if (!response.isOk()) {
+                if (callback) {
+                    callback(std::nullopt,
+                             protocol::describeError(response.code, response.message));
+                }
+                return;
+            }
+            UserStatusUpdateResult result;
+            QString parseError;
+            if (!UserStatusUpdateResult::fromJson(
+                    response.data, &result, &parseError)) {
+                if (callback) {
+                    callback(std::nullopt,
+                             QStringLiteral("用户状态响应异常：%1").arg(parseError));
+                }
+                return;
+            }
+            if (result.userId != request.userId
+                || result.previousStatus != request.expectedStatus
+                || result.status != request.targetStatus) {
+                if (callback) {
+                    callback(std::nullopt,
+                             QStringLiteral("用户状态响应与请求不匹配"));
+                }
+                return;
+            }
+            if (callback) callback(result, {});
+        });
+    return true;
+}
+
+bool AdminApiClient::isUserStatusUpdateInFlight() const
+{
+    return userStatusUpdateInFlight_;
+}
+
 QString AdminApiClient::sendAuthenticated(const QString& action,
                                           const QJsonObject& data,
                                           NetworkClient::ResponseCallback callback,

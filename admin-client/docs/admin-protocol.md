@@ -493,6 +493,155 @@
 - 成员 2 的用户端随后通过 `station.nearby`/`station.detail` 查询同一数据库事实，
   作为真实服务端阶段的跨端验收。
 
+## 用户列表与服务端搜索
+
+> 成员 A 已冻结 `admin.users.list` action、用户状态枚举以及 Repository 的用户字段，
+> 但管理员请求/响应字段仍等待其 Commit 6 纳入权威文档。以下是客户端先行的最小
+> 待冻结契约；Mock 只验证契约，不代表真实数据库。
+
+请求 action：`admin.users.list`
+
+```json
+{
+  "action": "admin.users.list",
+  "requestId": "admin-10",
+  "data": {
+    "page": 1,
+    "pageSize": 20,
+    "phoneKeyword": "3800",
+    "status": 0,
+    "activityFilter": "ACTIVE"
+  }
+}
+```
+
+- `page` 从 1 开始；`pageSize` 范围 1～100。
+- `phoneKeyword` 必须是 0～11 位数字。空字符串表示返回全部；查询使用手机号
+  `contains`/SQL `LIKE %keyword%` 语义，并且必须由服务端筛选，客户端不在当前页
+  上冒充全库查询。
+- `status` 可省略；省略表示全部，`0` 正常，`1` 冻结。
+- `activityFilter` 必填：`ALL` 全部、`ACTIVE` 存在活跃订单、`IDLE` 无活跃订单。
+  活跃订单严格指 A 已冻结的 `RESERVED / CHARGING / WAIT_SETTLEMENT`，不包含
+  `FINISHED`；此筛选同样必须在服务端分页前完成。
+- 客户端仅在点击“查询”、按回车、翻页或刷新时请求，不随每个输入字符发包。
+
+成功响应：
+
+```json
+{
+  "requestId": "admin-10",
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "users": [
+      {
+        "userId": 3,
+        "phone": "13800138003",
+        "nickname": "充电中用户",
+        "balance": 150.00,
+        "createdAt": 1788421800000,
+        "status": 0,
+        "activityStatus": "CHARGING",
+        "activeOrder": {
+          "orderId": 9003,
+          "status": "CHARGING",
+          "stationId": 2,
+          "stationName": "中关村科技园站",
+          "chargerId": 1007,
+          "chargerCode": "CP-007"
+        }
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "pageSize": 20
+  }
+}
+```
+
+- `total` 是全部匹配记录数，不是本页数组长度；结果按 `userId` 升序，保证翻页稳定。
+- `balance` 是元，客户端统一保留两位小数；数据库写入与扣款精度仍由服务端保证。
+- A 的 `UserRepository::User` 当前把 `createdAt` 保存为 epoch 毫秒，但权威文档的
+  通用时间规则仍写 ISO 8601。客户端过渡期同时接受 epoch 毫秒和合法 ISO 8601，
+  内部统一转 epoch 毫秒后按本地时区显示；成员 A 在 Commit 6 必须冻结最终线格式。
+- 空结果返回 `users: []`、`total: 0`，不返回 `null`。
+- `activityStatus` 取 `IDLE` 或三个活跃订单状态；`IDLE` 时 `activeOrder` 必须为
+  JSON `null`，其他状态必须带完整对象且内部 `status` 与外层一致。
+- `WAIT_SETTLEMENT` 是成员 A 订单状态机与用户端共同使用的真实值。其含义是充电
+  已停止、最终电量和应付金额已生成，但扣款及 `FINISHED` 状态写入尚未成功；管理端
+  与用户端统一显示“待支付”。它仍属于未完成订单，但客户端不得据此推断桩仍在物理充电。
+- 截至成员 A 分支当前实现，`order.stop` 只将订单推进到 `WAIT_SETTLEMENT`，而
+  `order.settle` 成功后才把桩恢复为空闲；这与早期“停止即释放桩”的文字约定存在
+  差异，必须由成员 A 冻结最终规则。管理端只显示服务端返回的关联设备，不自行改桩状态。
+- `activeOrder` 字段直接复用 A 已实现的订单和关联实体命名。管理端不调用用户专属
+  `order.active`，也不冒充用户会话；应由管理员列表服务通过 Repository 批量查询。
+- 服务端应在同一读快照中生成用户行和活跃订单，避免“状态是充电中但设备为空”；
+  实现时避免逐用户 N+1 查询。若读取期间订单刚完成，以最终一致的整行结果为准。
+- 客户端校验每行确实符合本次手机号、账号状态和使用状态条件；排序后操作仍读取隐藏的真实
+  `userId`，绝不使用视图行号。
+
+## 冻结与解冻用户
+
+请求 action：`admin.users.freeze`
+
+```json
+{
+  "action": "admin.users.freeze",
+  "requestId": "admin-11",
+  "data": {
+    "userId": 2,
+    "expectedStatus": 0,
+    "targetStatus": 1,
+    "reason": "疑似异常充电行为，人工复核"
+  }
+}
+```
+
+- 同一个 action 同时承担冻结与解冻：`targetStatus=1` 冻结，`targetStatus=0` 解冻。
+- `expectedStatus` 必须等于管理员刚看到的服务端状态；服务端在同一事务内比较并
+  更新，不一致返回待冻结扩展码 `2104`，避免两个管理员相互覆盖。
+- `reason` 去除首尾空白后为 2～200 字符，用于服务端审计；不得记录在普通日志中
+  的密码、证件等敏感信息。
+- 客户端根据列表中的 `activeOrder` 在确认框展示订单号、阶段、站点和桩编号，但
+  该信息只用于说明风险，不能作为写入前最终判断。服务端必须在事务内重新查询。
+- 对存在未完成订单的用户，客户端先显示独立风险弹窗，再进入原因填写；取消第一步
+  不发送请求。服务端拒绝时必须显示其 `message`，并重新查询，绝不插入本地成功状态。
+- 推荐的安全策略是：存在 `RESERVED / CHARGING / WAIT_SETTLEMENT` 时拒绝冻结并
+  返回 `2003` 及明确 `message`，避免用户被冻结后无法停止或结算；该策略仍需成员 A
+  在 Commit 6 权威文档中确认。客户端不绕过服务端结果。
+
+成功响应：
+
+```json
+{
+  "requestId": "admin-11",
+  "code": 0,
+  "message": "用户已冻结",
+  "data": {
+    "userId": 2,
+    "previousStatus": 0,
+    "status": 1,
+    "changedAt": 1788516000000
+  }
+}
+```
+
+- 客户端不乐观修改当前行；成功或失败后都重新调用 `admin.users.list`，按钮文字
+  由重新查询所得状态决定。
+- 若冻结成功，服务端必须让该用户之后的所有受保护业务请求返回 `1002`，不能只在
+  下一次登录时检查。现有连接如何失效由成员 A 冻结；公共无需登录的站点查询不能
+  作为冻结验收操作。
+- 当前成员 A 的 `UserService` 已在 `user.login` 检查冻结状态，但已登录连接上的
+  `user.profile.update`、`user.recharge` 以及订单写操作尚未看到统一冻结校验；因此
+  “已有会话跨端立即受限”仍是服务端 Commit 6 的待办，Mock 通过不代表真实服务端已完成。
+- 跨端验收至少使用 `user.profile.update`、`user.recharge` 或订单写操作之一确认
+  返回 `1002`；解冻后重新登录并验证同一操作恢复。用户端需将 `1002` 明确提示为
+  “账号已冻结，请联系管理员”。
+- Mock 对所有带 `activeOrder` 的未完成订单样例（包括 `WAIT_SETTLEMENT`）返回 `2003`，
+  不得按固定用户 ID 或只按 `CHARGING` 特判。冻结弹窗会先解释订单阶段和当前设备，
+  服务端拒绝后再展示真实 `message`。若 A 最终选择允许冻结，必须同时冻结活跃订单
+  如何停止/结算及旧连接如何处理，客户端再按权威规则调整。
+
 ## 会话规则
 
 - 当前版本不使用 token，服务端在登录成功后把 `adminId` 绑定到该 TCP 连接。
@@ -507,9 +656,11 @@
 |---:|---|
 | 0 | 成功 |
 | 1001 | 请求参数错误 |
+| 1002 | 用户账号被冻结（用户端受保护业务请求） |
 | 1003 | 未登录或会话失效 |
 | 1101 | 管理员账号或密码错误 |
 | 2101 | 充电桩正在服务订单，拒绝运维操作 |
 | 2102 | 站点版本冲突，旧资料不得覆盖新版本 |
 | 2103 | 充电桩当前状态与 `expectedStatus` 不一致 |
+| 2104 | 用户当前状态与 `expectedStatus` 不一致（待成员 A 冻结） |
 | 5000 | 服务端内部错误 |

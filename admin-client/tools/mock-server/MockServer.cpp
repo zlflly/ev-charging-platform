@@ -9,6 +9,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QPointer>
+#include <QRegularExpression>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTimer>
@@ -118,6 +119,33 @@ QJsonArray mockStations()
     };
 }
 
+QJsonArray mockUsers()
+{
+    const auto idle = [] {
+        return QJsonValue(QJsonValue::Null);
+    };
+    const auto active = [](int orderId, int stationId, const QString& stationName,
+                           int chargerId, const QString& chargerCode,
+                           const QString& status) {
+        return QJsonObject {
+            {QStringLiteral("orderId"), orderId},
+            {QStringLiteral("stationId"), stationId},
+            {QStringLiteral("stationName"), stationName},
+            {QStringLiteral("chargerId"), chargerId},
+            {QStringLiteral("chargerCode"), chargerCode},
+            {QStringLiteral("status"), status},
+        };
+    };
+    return {
+        QJsonObject {{QStringLiteral("userId"), 1}, {QStringLiteral("phone"), QStringLiteral("13800138001")}, {QStringLiteral("nickname"), QStringLiteral("用户8001")}, {QStringLiteral("balance"), 50.00}, {QStringLiteral("createdAt"), 1788240600000.0}, {QStringLiteral("status"), protocol::UserStatusNormal}, {QStringLiteral("activityStatus"), QStringLiteral("IDLE")}, {QStringLiteral("activeOrder"), idle()}},
+        QJsonObject {{QStringLiteral("userId"), 2}, {QStringLiteral("phone"), QStringLiteral("13800138002")}, {QStringLiteral("nickname"), QStringLiteral("用户8002")}, {QStringLiteral("balance"), 100.50}, {QStringLiteral("createdAt"), 1788331200000.0}, {QStringLiteral("status"), protocol::UserStatusNormal}, {QStringLiteral("activityStatus"), QStringLiteral("IDLE")}, {QStringLiteral("activeOrder"), idle()}},
+        QJsonObject {{QStringLiteral("userId"), 3}, {QStringLiteral("phone"), QStringLiteral("13800138003")}, {QStringLiteral("nickname"), QStringLiteral("充电中用户")}, {QStringLiteral("balance"), 150.00}, {QStringLiteral("createdAt"), 1788421800000.0}, {QStringLiteral("status"), protocol::UserStatusNormal}, {QStringLiteral("activityStatus"), QStringLiteral("CHARGING")}, {QStringLiteral("activeOrder"), active(9003, 2, QStringLiteral("中关村科技园站"), 1007, QStringLiteral("CP-007"), QStringLiteral("CHARGING"))}},
+        QJsonObject {{QStringLiteral("userId"), 4}, {QStringLiteral("phone"), QStringLiteral("13912345678")}, {QStringLiteral("nickname"), QStringLiteral("风控样例")}, {QStringLiteral("balance"), 0.00}, {QStringLiteral("createdAt"), 1788426000000.0}, {QStringLiteral("status"), protocol::UserStatusFrozen}, {QStringLiteral("activityStatus"), QStringLiteral("IDLE")}, {QStringLiteral("activeOrder"), idle()}},
+        QJsonObject {{QStringLiteral("userId"), 5}, {QStringLiteral("phone"), QStringLiteral("18688886666")}, {QStringLiteral("nickname"), QStringLiteral("待结算用户")}, {QStringLiteral("balance"), 28.80}, {QStringLiteral("createdAt"), 1788470700000.0}, {QStringLiteral("status"), protocol::UserStatusNormal}, {QStringLiteral("activityStatus"), QStringLiteral("WAIT_SETTLEMENT")}, {QStringLiteral("activeOrder"), active(9005, 1, QStringLiteral("良乡大学城站"), 1002, QStringLiteral("CP-002"), QStringLiteral("WAIT_SETTLEMENT"))}},
+        QJsonObject {{QStringLiteral("userId"), 6}, {QStringLiteral("phone"), QStringLiteral("15100001234")}, {QStringLiteral("nickname"), QStringLiteral("测试用户")}, {QStringLiteral("balance"), 9.90}, {QStringLiteral("createdAt"), 1788480900000.0}, {QStringLiteral("status"), protocol::UserStatusNormal}, {QStringLiteral("activityStatus"), QStringLiteral("IDLE")}, {QStringLiteral("activeOrder"), idle()}},
+    };
+}
+
 class MockServer final : public QObject
 {
 public:
@@ -125,6 +153,7 @@ public:
         : QObject(parent)
         , stations_(mockStations())
         , chargers_(mockChargers())
+        , users_(mockUsers())
     {
         connect(&server_, &QTcpServer::newConnection, this, [this] {
             while (auto* socket = server_.nextPendingConnection()) {
@@ -289,6 +318,130 @@ private:
                     {QStringLiteral("account"), QStringLiteral("admin")},
                     {QStringLiteral("displayName"), QStringLiteral("系统管理员")},
                 });
+            }
+        } else if (action == QString::fromUtf8(
+                       protocol::action::kAdminUserList)) {
+            if (adminIds_.value(socket) <= 0) {
+                response.insert(QStringLiteral("code"), protocol::CodeNotLoggedIn);
+                response.insert(QStringLiteral("message"), QStringLiteral("administrator login required"));
+            } else {
+                const QJsonValue pageValue = requestData.value(QStringLiteral("page"));
+                const QJsonValue sizeValue = requestData.value(QStringLiteral("pageSize"));
+                const QJsonValue keywordValue = requestData.value(QStringLiteral("phoneKeyword"));
+                const double pageNumber = pageValue.toDouble(-1.0);
+                const double sizeNumber = sizeValue.toDouble(-1.0);
+                const QString keyword = keywordValue.toString();
+                const QString activityFilter = requestData.value(
+                    QStringLiteral("activityFilter")).toString();
+                const bool hasStatus = requestData.contains(QStringLiteral("status"));
+                const QJsonValue statusValue = requestData.value(QStringLiteral("status"));
+                const double statusNumber = statusValue.toDouble(-1.0);
+                static const QRegularExpression digits(QStringLiteral("^\\d{0,11}$"));
+                const bool valid = pageValue.isDouble() && std::floor(pageNumber) == pageNumber
+                    && pageNumber >= 1.0 && sizeValue.isDouble()
+                    && std::floor(sizeNumber) == sizeNumber && sizeNumber >= 1.0
+                    && sizeNumber <= 100.0 && keywordValue.isString()
+                    && digits.match(keyword).hasMatch()
+                    && (activityFilter == QStringLiteral("ALL")
+                        || activityFilter == QStringLiteral("ACTIVE")
+                        || activityFilter == QStringLiteral("IDLE"))
+                    && (!hasStatus || (statusValue.isDouble()
+                        && (statusNumber == protocol::UserStatusNormal
+                            || statusNumber == protocol::UserStatusFrozen)));
+                if (!valid) {
+                    response.insert(QStringLiteral("code"), protocol::CodeBadRequest);
+                    response.insert(QStringLiteral("message"), QStringLiteral("用户查询参数不符合协议"));
+                } else {
+                    QJsonArray filtered;
+                    for (const QJsonValue value : users_) {
+                        const QJsonObject user = value.toObject();
+                        if (!keyword.isEmpty()
+                            && !user.value(QStringLiteral("phone")).toString().contains(keyword)) continue;
+                        if (hasStatus
+                            && user.value(QStringLiteral("status")).toInt(-1) != static_cast<int>(statusNumber)) continue;
+                        const bool isActive = user.value(
+                            QStringLiteral("activityStatus")).toString()
+                            != QStringLiteral("IDLE");
+                        if ((activityFilter == QStringLiteral("ACTIVE") && !isActive)
+                            || (activityFilter == QStringLiteral("IDLE") && isActive)) continue;
+                        filtered.append(user);
+                    }
+                    const int page = static_cast<int>(pageNumber);
+                    const int pageSize = static_cast<int>(sizeNumber);
+                    const int start = (page - 1) * pageSize;
+                    QJsonArray paged;
+                    for (int index = start; index < filtered.size() && index < start + pageSize; ++index) {
+                        paged.append(filtered.at(index));
+                    }
+                    response.insert(QStringLiteral("data"), QJsonObject {
+                        {QStringLiteral("users"), paged},
+                        {QStringLiteral("total"), filtered.size()},
+                        {QStringLiteral("page"), page},
+                        {QStringLiteral("pageSize"), pageSize},
+                    });
+                }
+            }
+        } else if (action == QString::fromUtf8(
+                       protocol::action::kAdminUserFreeze)) {
+            if (adminIds_.value(socket) <= 0) {
+                response.insert(QStringLiteral("code"), protocol::CodeNotLoggedIn);
+                response.insert(QStringLiteral("message"), QStringLiteral("administrator login required"));
+            } else {
+                const QJsonValue idValue = requestData.value(QStringLiteral("userId"));
+                const QJsonValue expectedValue = requestData.value(QStringLiteral("expectedStatus"));
+                const QJsonValue targetValue = requestData.value(QStringLiteral("targetStatus"));
+                const double idNumber = idValue.toDouble(-1.0);
+                const double expectedNumber = expectedValue.toDouble(-1.0);
+                const double targetNumber = targetValue.toDouble(-1.0);
+                const QString reason = requestData.value(QStringLiteral("reason")).toString().trimmed();
+                const auto statusValid = [](double status) {
+                    return status == protocol::UserStatusNormal
+                        || status == protocol::UserStatusFrozen;
+                };
+                const bool valid = idValue.isDouble() && std::floor(idNumber) == idNumber
+                    && idNumber > 0.0 && expectedValue.isDouble() && statusValid(expectedNumber)
+                    && targetValue.isDouble() && statusValid(targetNumber)
+                    && expectedNumber != targetNumber && reason.size() >= 2 && reason.size() <= 200;
+                int userIndex = -1;
+                if (valid) {
+                    for (int index = 0; index < users_.size(); ++index) {
+                        if (users_.at(index).toObject().value(QStringLiteral("userId")).toDouble() == idNumber) {
+                            userIndex = index;
+                            break;
+                        }
+                    }
+                }
+                if (!valid) {
+                    response.insert(QStringLiteral("code"), protocol::CodeBadRequest);
+                    response.insert(QStringLiteral("message"), QStringLiteral("用户状态参数不符合协议"));
+                } else if (userIndex < 0) {
+                    response.insert(QStringLiteral("code"), protocol::CodeBadRequest);
+                    response.insert(QStringLiteral("message"), QStringLiteral("用户不存在"));
+                } else {
+                    QJsonObject user = users_.at(userIndex).toObject();
+                    const int current = user.value(QStringLiteral("status")).toInt(-1);
+                    if (current != static_cast<int>(expectedNumber)) {
+                        response.insert(QStringLiteral("code"), protocol::CodeUserStateConflict);
+                        response.insert(QStringLiteral("message"), QStringLiteral("用户状态已变化，请刷新后重试"));
+                    } else if (targetNumber == protocol::UserStatusFrozen
+                               && user.value(QStringLiteral("activeOrder")).isObject()) {
+                        // 覆盖 RESERVED / CHARGING / WAIT_SETTLEMENT；生产规则仍由服务端决定。
+                        response.insert(QStringLiteral("code"), protocol::CodeOrderConflict);
+                        response.insert(QStringLiteral("message"), QStringLiteral("用户存在未完成订单，服务端拒绝冻结"));
+                    } else {
+                        const int target = static_cast<int>(targetNumber);
+                        user.insert(QStringLiteral("status"), target);
+                        users_.replace(userIndex, user);
+                        response.insert(QStringLiteral("message"), target == protocol::UserStatusFrozen
+                            ? QStringLiteral("用户已冻结") : QStringLiteral("用户已解冻"));
+                        response.insert(QStringLiteral("data"), QJsonObject {
+                            {QStringLiteral("userId"), idNumber},
+                            {QStringLiteral("previousStatus"), current},
+                            {QStringLiteral("status"), target},
+                            {QStringLiteral("changedAt"), static_cast<double>(QDateTime::currentMSecsSinceEpoch())},
+                        });
+                    }
+                }
             }
         } else if (action == QString::fromUtf8(
                        protocol::action::kAdminChargerOverview)) {
@@ -749,6 +902,7 @@ private:
     QTcpServer server_;
     QJsonArray stations_;
     QJsonArray chargers_;
+    QJsonArray users_;
     QHash<QTcpSocket*, QByteArray> buffers_;
     QHash<QTcpSocket*, qint64> adminIds_;
 };

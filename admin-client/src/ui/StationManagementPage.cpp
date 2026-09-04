@@ -32,28 +32,28 @@ namespace {
 QColor onlineRateColor(const Station& station)
 {
     if (station.totalCount == 0) {
-        return QColor(QStringLiteral("#8DA8C0"));
+        return QColor(QStringLiteral("#718399"));
     }
     if (station.onlineRate >= 95.0) {
-        return QColor(QStringLiteral("#38E6A5"));
+        return QColor(QStringLiteral("#14865A"));
     }
     if (station.onlineRate >= 80.0) {
-        return QColor(QStringLiteral("#48C8FF"));
+        return QColor(QStringLiteral("#1769E8"));
     }
     if (station.onlineRate >= 60.0) {
-        return QColor(QStringLiteral("#FFC04D"));
+        return QColor(QStringLiteral("#A66C00"));
     }
-    return QColor(QStringLiteral("#FF6268"));
+    return QColor(QStringLiteral("#C43742"));
 }
 
 QColor chargerStatusColor(int status)
 {
     switch (status) {
-    case protocol::ChargerStatusIdle:     return QColor(QStringLiteral("#38E6A5"));
-    case protocol::ChargerStatusCharging: return QColor(QStringLiteral("#48C8FF"));
-    case protocol::ChargerStatusFault:    return QColor(QStringLiteral("#FF6268"));
-    case protocol::ChargerStatusOffline:  return QColor(QStringLiteral("#8DA8C0"));
-    default:                              return QColor(QStringLiteral("#FFC04D"));
+    case protocol::ChargerStatusIdle:     return QColor(QStringLiteral("#14865A"));
+    case protocol::ChargerStatusCharging: return QColor(QStringLiteral("#1769E8"));
+    case protocol::ChargerStatusFault:    return QColor(QStringLiteral("#C43742"));
+    case protocol::ChargerStatusOffline:  return QColor(QStringLiteral("#718399"));
+    default:                              return QColor(QStringLiteral("#A66C00"));
     }
 }
 

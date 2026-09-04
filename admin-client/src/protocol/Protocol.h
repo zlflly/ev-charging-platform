@@ -19,8 +19,17 @@ inline constexpr const char* kAdminChargerStatusUpdate = "admin.chargers.status.
 inline constexpr const char* kAdminStationList = "admin.stations.list";
 inline constexpr const char* kAdminStationCreate = "admin.stations.create";
 inline constexpr const char* kAdminStationUpdate = "admin.stations.update";
+inline constexpr const char* kAdminUserList = "admin.users.list";
+inline constexpr const char* kAdminUserFreeze = "admin.users.freeze";
 inline constexpr const char* kStationDetail = "station.detail";
 } // namespace action
+
+namespace orderStatus {
+inline constexpr const char* kReserved = "RESERVED";
+inline constexpr const char* kCharging = "CHARGING";
+inline constexpr const char* kWaitSettlement = "WAIT_SETTLEMENT";
+inline constexpr const char* kFinished = "FINISHED";
+} // namespace orderStatus
 
 inline constexpr int kFrameLengthPrefixBytes = 4;
 inline constexpr qint64 kMaxPayloadBytes = 16 * 1024 * 1024;
@@ -39,14 +48,22 @@ enum ChargerType {
     ChargerTypeSlow = 1,
 };
 
+enum UserStatus {
+    UserStatusNormal = 0,
+    UserStatusFrozen = 1,
+};
+
 enum ErrorCode {
     CodeOk = 0,
     CodeBadRequest = 1001,
+    CodeUserFrozen = 1002,
     CodeNotLoggedIn = 1003,
     CodeInvalidAdminCredentials = 1101,
+    CodeOrderConflict = 2003,
     CodeChargerOperationRejected = 2101,
     CodeStationVersionConflict = 2102,
     CodeChargerStateConflict = 2103,
+    CodeUserStateConflict = 2104,
     CodeServerError = 5000,
 };
 
@@ -100,10 +117,16 @@ inline QString describeError(int code, const QString& serverMessage = {})
         return QStringLiteral("服务器响应格式异常");
     case CodeBadRequest:
         return serverMessage.isEmpty() ? QStringLiteral("提交的参数不正确") : serverMessage;
+    case CodeUserFrozen:
+        return serverMessage.isEmpty()
+            ? QStringLiteral("用户账号已被冻结") : serverMessage;
     case CodeNotLoggedIn:
         return QStringLiteral("登录状态已失效，请重新登录");
     case CodeInvalidAdminCredentials:
         return QStringLiteral("管理员账号或密码错误");
+    case CodeOrderConflict:
+        return serverMessage.isEmpty()
+            ? QStringLiteral("订单状态冲突") : serverMessage;
     case CodeChargerOperationRejected:
         return serverMessage.isEmpty()
             ? QStringLiteral("充电桩正在服务订单，当前禁止执行运维操作")
@@ -115,6 +138,10 @@ inline QString describeError(int code, const QString& serverMessage = {})
     case CodeChargerStateConflict:
         return serverMessage.isEmpty()
             ? QStringLiteral("充电桩状态已变化，请刷新后重试")
+            : serverMessage;
+    case CodeUserStateConflict:
+        return serverMessage.isEmpty()
+            ? QStringLiteral("用户状态已变化，请刷新后重试")
             : serverMessage;
     case CodeServerError:
         return serverMessage.isEmpty() ? QStringLiteral("服务器内部错误") : serverMessage;
