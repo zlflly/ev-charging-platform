@@ -1,6 +1,7 @@
 #pragma once
 
 #include "model/ChargerStatusOverview.h"
+#include "model/Charger.h"
 #include "net/NetworkClient.h"
 
 #include <QJsonObject>
@@ -22,6 +23,10 @@ public:
     using ChargerOverviewCallback = std::function<void(
         std::optional<ChargerStatusOverview> overview,
         const QString& errorMessage)>;
+    using ChargerListCallback = std::function<void(
+        std::optional<QList<Charger>> chargers,
+        const QString& errorMessage)>;
+    using OperationCallback = std::function<void(bool ok, const QString& message)>;
 
     explicit AdminApiClient(NetworkClient* network,
                             AdminSession* session,
@@ -32,6 +37,10 @@ public:
     bool isLoginInFlight() const;
     bool requestChargerOverview(ChargerOverviewCallback callback);
     bool isChargerOverviewInFlight() const;
+    bool requestChargers(ChargerListCallback callback);
+    bool isChargerListInFlight() const;
+    bool restartCharger(qint64 chargerId, OperationCallback callback);
+    bool isChargerRestartInFlight() const;
 
     QString sendAuthenticated(const QString& action,
                               const QJsonObject& data,
@@ -52,6 +61,8 @@ private:
     AdminSession* session_ = nullptr;
     bool loginInFlight_ = false;
     bool chargerOverviewInFlight_ = false;
+    bool chargerListInFlight_ = false;
+    bool chargerRestartInFlight_ = false;
     QString pendingAccount_;
     QString pendingPassword_;
 };

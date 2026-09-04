@@ -11,6 +11,7 @@ class QPushButton;
 class QStackedWidget;
 class QWidget;
 class ChargerStatusOverviewWidget;
+class ChargerManagementPage;
 
 class MainWindow final : public QMainWindow
 {
@@ -29,7 +30,6 @@ private:
     QWidget* createSidebar();
     QWidget* createTopbar();
     QWidget* createOverviewPage();
-    QWidget* createChargerPage();
     QWidget* createStationPage();
     QWidget* createUserPage();
     QWidget* createRevenuePage();
@@ -63,6 +63,7 @@ private:
     QLabel* adminAccountLabel_ = nullptr;
     QLabel* chargerTotalLabel_ = nullptr;
     ChargerStatusOverviewWidget* chargerOverviewWidget_ = nullptr;
+    ChargerManagementPage* chargerManagementPage_ = nullptr;
     QPushButton* connectionButton_ = nullptr;
     QList<QPushButton*> navigationButtons_;
 };

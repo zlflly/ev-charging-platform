@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QModelIndex>
+#include <QColor>
 #include <QList>
 #include <QStringList>
 #include <QVariant>
@@ -20,10 +21,20 @@ class EntityTableView final : public QWidget
 public:
     enum class State { Loading, Ready, Empty, Error };
     static constexpr int EntityIdRole = Qt::UserRole + 1;
+    static constexpr int SortValueRole = Qt::UserRole + 2;
+
+    struct CellStyle {
+        int column = -1;
+        QColor foreground;
+        QColor background;
+        bool bold = false;
+    };
 
     struct Row {
         QVariant entityId;
         QStringList cells;
+        QList<CellStyle> styles;
+        QList<QVariant> sortValues;
     };
 
     explicit EntityTableView(const QStringList& headers, QWidget* parent = nullptr);

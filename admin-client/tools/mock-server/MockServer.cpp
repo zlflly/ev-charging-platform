@@ -5,6 +5,7 @@
 #include <QDateTime>
 #include <QHash>
 #include <QHostAddress>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QPointer>
@@ -14,6 +15,7 @@
 #include <QtEndian>
 
 #include <cstdio>
+#include <cmath>
 #include <cstring>
 
 namespace {
@@ -26,6 +28,50 @@ QByteArray makeFrame(const QJsonObject& object)
     frame.append(reinterpret_cast<const char*>(&length), protocol::kFrameLengthPrefixBytes);
     frame.append(payload);
     return frame;
+}
+
+QJsonArray mockChargers()
+{
+    const int statuses[] = {
+        protocol::ChargerStatusIdle,
+        protocol::ChargerStatusIdle,
+        protocol::ChargerStatusIdle,
+        protocol::ChargerStatusIdle,
+        protocol::ChargerStatusIdle,
+        protocol::ChargerStatusIdle,
+        protocol::ChargerStatusCharging,
+        protocol::ChargerStatusCharging,
+        protocol::ChargerStatusCharging,
+        protocol::ChargerStatusFault,
+        protocol::ChargerStatusFault,
+        protocol::ChargerStatusOffline,
+    };
+    const QString stationNames[] = {
+        QStringLiteral("良乡大学城站"),
+        QStringLiteral("中关村科技园站"),
+        QStringLiteral("西山运营站"),
+    };
+
+    QJsonArray chargers;
+    for (int index = 0; index < 12; ++index) {
+        const int stationIndex = index / 4;
+        const bool fast = index % 2 == 0;
+        chargers.append(QJsonObject {
+            {QStringLiteral("chargerId"), 1001 + index},
+            {QStringLiteral("code"),
+             QStringLiteral("CP-%1").arg(index + 1, 3, 10, QChar(u'0'))},
+            {QStringLiteral("stationId"), stationIndex + 1},
+            {QStringLiteral("stationName"), stationNames[stationIndex]},
+            {QStringLiteral("type"), fast ? protocol::ChargerTypeFast
+                                           : protocol::ChargerTypeSlow},
+            {QStringLiteral("powerKw"), fast ? 120.0 : 7.0},
+            {QStringLiteral("status"), statuses[index]},
+            {QStringLiteral("totalChargeCount"), 36 + index * 7},
+            {QStringLiteral("totalChargeDurationSeconds"),
+             5400 + index * 1800},
+        });
+    }
+    return chargers;
 }
 
 class MockServer final : public QObject
@@ -137,6 +183,71 @@ private:
                     {QStringLiteral("updatedAt"),
                      QDateTime::currentMSecsSinceEpoch()},
                 });
+            }
+        } else if (action == QString::fromUtf8(
+                       protocol::action::kAdminChargerList)) {
+            if (adminIds_.value(socket) <= 0) {
+                response.insert(QStringLiteral("code"), protocol::CodeNotLoggedIn);
+                response.insert(QStringLiteral("message"),
+                                QStringLiteral("administrator login required"));
+            } else {
+                response.insert(QStringLiteral("data"), QJsonObject {
+                    {QStringLiteral("chargers"), mockChargers()},
+                });
+            }
+        } else if (action == QString::fromUtf8(
+                       protocol::action::kAdminChargerRestart)) {
+            if (adminIds_.value(socket) <= 0) {
+                response.insert(QStringLiteral("code"), protocol::CodeNotLoggedIn);
+                response.insert(QStringLiteral("message"),
+                                QStringLiteral("administrator login required"));
+            } else {
+                const QJsonValue chargerIdValue =
+                    requestData.value(QStringLiteral("chargerId"));
+                const double chargerIdNumber = chargerIdValue.toDouble();
+                const bool validChargerId = chargerIdValue.isDouble()
+                    && std::isfinite(chargerIdNumber)
+                    && chargerIdNumber >= 1.0
+                    && chargerIdNumber <= 9007199254740991.0
+                    && std::floor(chargerIdNumber) == chargerIdNumber;
+                const qint64 chargerId = validChargerId
+                    ? static_cast<qint64>(chargerIdNumber) : 0;
+                QJsonObject selected;
+                if (validChargerId) {
+                    const QJsonArray chargers = mockChargers();
+                    for (const QJsonValue value : chargers) {
+                        const QJsonObject charger = value.toObject();
+                        if (static_cast<qint64>(charger.value(
+                                QStringLiteral("chargerId")).toDouble()) == chargerId) {
+                            selected = charger;
+                            break;
+                        }
+                    }
+                }
+
+                if (!validChargerId) {
+                    response.insert(QStringLiteral("code"), protocol::CodeBadRequest);
+                    response.insert(QStringLiteral("message"),
+                                    QStringLiteral("chargerId must be a positive integer"));
+                } else if (selected.isEmpty()) {
+                    response.insert(QStringLiteral("code"), protocol::CodeBadRequest);
+                    response.insert(QStringLiteral("message"),
+                                    QStringLiteral("充电桩不存在"));
+                } else if (selected.value(QStringLiteral("status")).toInt()
+                           == protocol::ChargerStatusCharging) {
+                    response.insert(QStringLiteral("code"),
+                                    protocol::CodeChargerOperationRejected);
+                    response.insert(QStringLiteral("message"),
+                                    QStringLiteral("充电桩正在服务订单，禁止远程重启"));
+                } else {
+                    response.insert(QStringLiteral("message"),
+                                    QStringLiteral("服务器已接受重启指令"));
+                    response.insert(QStringLiteral("data"), QJsonObject {
+                        {QStringLiteral("chargerId"), chargerId},
+                        {QStringLiteral("restartedAt"),
+                         QDateTime::currentMSecsSinceEpoch()},
+                    });
+                }
             }
         } else {
             response.insert(QStringLiteral("code"), 1001);

@@ -13,6 +13,8 @@ namespace action {
 inline constexpr const char* kPing = "PING";
 inline constexpr const char* kAdminLogin = "admin.login";
 inline constexpr const char* kAdminChargerOverview = "admin.charger.overview";
+inline constexpr const char* kAdminChargerList = "admin.charger.list";
+inline constexpr const char* kAdminChargerRestart = "admin.charger.restart";
 } // namespace action
 
 inline constexpr int kFrameLengthPrefixBytes = 4;
@@ -27,11 +29,17 @@ enum ChargerStatus {
     ChargerStatusOffline = 3,
 };
 
+enum ChargerType {
+    ChargerTypeFast = 0,
+    ChargerTypeSlow = 1,
+};
+
 enum ErrorCode {
     CodeOk = 0,
     CodeBadRequest = 1001,
     CodeNotLoggedIn = 1003,
     CodeInvalidAdminCredentials = 1101,
+    CodeChargerOperationRejected = 2101,
     CodeServerError = 5000,
 };
 
@@ -89,6 +97,10 @@ inline QString describeError(int code, const QString& serverMessage = {})
         return QStringLiteral("登录状态已失效，请重新登录");
     case CodeInvalidAdminCredentials:
         return QStringLiteral("管理员账号或密码错误");
+    case CodeChargerOperationRejected:
+        return serverMessage.isEmpty()
+            ? QStringLiteral("充电桩正在服务订单，当前禁止执行运维操作")
+            : serverMessage;
     case CodeServerError:
         return serverMessage.isEmpty() ? QStringLiteral("服务器内部错误") : serverMessage;
     default:

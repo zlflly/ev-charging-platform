@@ -6,6 +6,7 @@
 
 #include <QJsonObject>
 
+#include <cmath>
 #include <utility>
 
 AdminApiClient::AdminApiClient(NetworkClient* network,
@@ -114,6 +115,105 @@ bool AdminApiClient::requestChargerOverview(ChargerOverviewCallback callback)
 bool AdminApiClient::isChargerOverviewInFlight() const
 {
     return chargerOverviewInFlight_;
+}
+
+bool AdminApiClient::requestChargers(ChargerListCallback callback)
+{
+    if (chargerListInFlight_ || chargerRestartInFlight_) {
+        return false;
+    }
+
+    chargerListInFlight_ = true;
+    sendAuthenticated(
+        QString::fromUtf8(protocol::action::kAdminChargerList), {},
+        [this, callback = std::move(callback)](const protocol::Response& response) {
+            chargerListInFlight_ = false;
+            if (!response.isOk()) {
+                if (callback) {
+                    callback(std::nullopt,
+                             protocol::describeError(response.code, response.message));
+                }
+                return;
+            }
+
+            const QJsonValue chargersValue =
+                response.data.value(QStringLiteral("chargers"));
+            if (!chargersValue.isArray()) {
+                if (callback) {
+                    callback(std::nullopt,
+                             QStringLiteral("充电桩列表响应缺少 chargers 数组"));
+                }
+                return;
+            }
+
+            QList<Charger> chargers;
+            QString parseError;
+            if (!Charger::listFromJson(chargersValue.toArray(), &chargers, &parseError)) {
+                if (callback) {
+                    callback(std::nullopt,
+                             QStringLiteral("充电桩列表数据异常：%1").arg(parseError));
+                }
+                return;
+            }
+
+            if (callback) {
+                callback(chargers, {});
+            }
+        });
+    return true;
+}
+
+bool AdminApiClient::isChargerListInFlight() const
+{
+    return chargerListInFlight_;
+}
+
+bool AdminApiClient::restartCharger(qint64 chargerId, OperationCallback callback)
+{
+    if (chargerRestartInFlight_ || chargerListInFlight_ || chargerId <= 0) {
+        return false;
+    }
+
+    chargerRestartInFlight_ = true;
+    QJsonObject data;
+    data.insert(QStringLiteral("chargerId"), chargerId);
+    sendAuthenticated(
+        QString::fromUtf8(protocol::action::kAdminChargerRestart), data,
+        [this, chargerId, callback = std::move(callback)](
+            const protocol::Response& response) {
+            chargerRestartInFlight_ = false;
+            if (!response.isOk()) {
+                if (callback) {
+                    callback(false,
+                             protocol::describeError(response.code, response.message));
+                }
+                return;
+            }
+
+            const QJsonValue responseIdValue =
+                response.data.value(QStringLiteral("chargerId"));
+            const double responseIdNumber = responseIdValue.toDouble();
+            if (!responseIdValue.isDouble() || !std::isfinite(responseIdNumber)
+                || std::floor(responseIdNumber) != responseIdNumber
+                || responseIdNumber != static_cast<double>(chargerId)) {
+                if (callback) {
+                    callback(false, QStringLiteral("重启响应中的充电桩 ID 不匹配"));
+                }
+                return;
+            }
+
+            if (callback) {
+                callback(true, response.message.isEmpty()
+                                   ? QStringLiteral("服务器已接受重启指令")
+                                   : response.message);
+            }
+        });
+    return true;
+}
+
+bool AdminApiClient::isChargerRestartInFlight() const
+{
+    return chargerRestartInFlight_;
 }
 
 QString AdminApiClient::sendAuthenticated(const QString& action,

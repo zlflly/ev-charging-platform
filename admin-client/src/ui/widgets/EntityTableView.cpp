@@ -1,6 +1,8 @@
 #include "ui/widgets/EntityTableView.h"
 
 #include <QAbstractItemView>
+#include <QBrush>
+#include <QFont>
 #include <QHeaderView>
 #include <QLabel>
 #include <QPushButton>
@@ -21,6 +23,7 @@ EntityTableView::EntityTableView(const QStringList& headers, QWidget* parent)
     model_->setHorizontalHeaderLabels(headers);
     proxy_->setSourceModel(model_);
     proxy_->setDynamicSortFilter(true);
+    proxy_->setSortRole(SortValueRole);
 
     table_->setModel(proxy_);
     table_->setAlternatingRowColors(true);
@@ -28,6 +31,7 @@ EntityTableView::EntityTableView(const QStringList& headers, QWidget* parent)
     table_->setSelectionMode(QAbstractItemView::SingleSelection);
     table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table_->setSortingEnabled(true);
+    table_->sortByColumn(0, Qt::AscendingOrder);
     table_->verticalHeader()->setVisible(false);
     table_->verticalHeader()->setDefaultSectionSize(42);
     table_->horizontalHeader()->setStretchLastSection(true);
@@ -77,9 +81,32 @@ void EntityTableView::setRows(const QList<Row>& rows)
         while (items.size() < model_->columnCount()) {
             items.append(new QStandardItem);
         }
+        for (int column = 0; column < items.size(); ++column) {
+            const QVariant sortValue = column < row.sortValues.size()
+                ? row.sortValues.at(column)
+                : items.at(column)->text();
+            items.at(column)->setData(sortValue, SortValueRole);
+        }
         if (!items.isEmpty()) {
             // ID 存在 model 的自定义 role 中，不依赖可变的视图行号或显示文本。
             items.first()->setData(row.entityId, EntityIdRole);
+        }
+        for (const CellStyle& style : row.styles) {
+            if (style.column < 0 || style.column >= items.size()) {
+                continue;
+            }
+            QStandardItem* item = items.at(style.column);
+            if (style.foreground.isValid()) {
+                item->setForeground(QBrush(style.foreground));
+            }
+            if (style.background.isValid()) {
+                item->setBackground(QBrush(style.background));
+            }
+            if (style.bold) {
+                QFont font = item->font();
+                font.setBold(true);
+                item->setFont(font);
+            }
         }
         model_->appendRow(items);
     }

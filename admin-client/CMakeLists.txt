@@ -12,10 +12,12 @@ qt_add_executable(admin-client
     src/main.cpp
     src/app/ApplicationController.cpp
     src/api/AdminApiClient.cpp
+    src/model/Charger.cpp
     src/model/ChargerStatusOverview.cpp
     src/net/NetworkClient.cpp
     src/session/AdminSession.cpp
     src/ui/LoginWindow.cpp
+    src/ui/ChargerManagementPage.cpp
     src/ui/MainWindow.cpp
     src/ui/widgets/ChargerStatusOverviewWidget.cpp
     src/ui/widgets/EntityTableView.cpp
@@ -59,9 +61,21 @@ target_link_libraries(admin-auth-smoke-test PRIVATE Qt6::Core Qt6::Network)
 qt_add_executable(admin-charger-overview-smoke-test
     tests/AdminChargerOverviewSmokeTest.cpp
     src/api/AdminApiClient.cpp
+    src/model/Charger.cpp
     src/model/ChargerStatusOverview.cpp
     src/net/NetworkClient.cpp
     src/session/AdminSession.cpp
 )
 target_include_directories(admin-charger-overview-smoke-test PRIVATE src)
 target_link_libraries(admin-charger-overview-smoke-test PRIVATE Qt6::Core Qt6::Network)
+
+qt_add_executable(admin-charger-management-smoke-test
+    tests/AdminChargerManagementSmokeTest.cpp
+    src/api/AdminApiClient.cpp
+    src/model/Charger.cpp
+    src/model/ChargerStatusOverview.cpp
+    src/net/NetworkClient.cpp
+    src/session/AdminSession.cpp
+)
+target_include_directories(admin-charger-management-smoke-test PRIVATE src)
+target_link_libraries(admin-charger-management-smoke-test PRIVATE Qt6::Core Qt6::Network)
