@@ -3,6 +3,7 @@
 #include "config/AppConfig.h"
 #include "net/NetworkClient.h"
 #include "protocol/Protocol.h"
+#include "session/AdminSession.h"
 #include "ui/theme/Theme.h"
 #include "ui/widgets/EntityTableView.h"
 
@@ -47,10 +48,15 @@ QLabel* makeLabel(const QString& text, const QString& objectName, QWidget* paren
 
 } // namespace
 
-MainWindow::MainWindow(QWidget* parent)
+MainWindow::MainWindow(NetworkClient* network,
+                       AdminSession* session,
+                       QWidget* parent)
     : QMainWindow(parent)
-    , network_(new NetworkClient(this))
+    , network_(network)
+    , session_(session)
 {
+    Q_ASSERT(network_);
+    Q_ASSERT(session_);
     setWindowTitle(QStringLiteral("EV 充电运营中心"));
     resize(1440, 900);
     setMinimumSize(1180, 720);
@@ -90,6 +96,8 @@ MainWindow::MainWindow(QWidget* parent)
             [this](int, const QString&) {
                 setConnectionState(QStringLiteral("offline"), QStringLiteral("服务未连接"));
             });
+    connect(session_, &AdminSession::changed,
+            this, &MainWindow::refreshAdminInfo);
 
     switchPage(0);
     auto* clockTimer = new QTimer(this);
@@ -149,10 +157,19 @@ QWidget* MainWindow::createSidebar()
     auto* adminLayout = new QVBoxLayout(admin);
     adminLayout->setContentsMargins(20, 14, 20, 0);
     adminLayout->setSpacing(2);
-    adminLayout->addWidget(makeLabel(QStringLiteral("管理员会话"),
-                                     QStringLiteral("brandTitle"), admin));
-    adminLayout->addWidget(makeLabel(QStringLiteral("等待 Commit 1 接入认证"),
-                                     QStringLiteral("muted"), admin));
+    adminNameLabel_ = makeLabel(QStringLiteral("管理员"),
+                                QStringLiteral("brandTitle"), admin);
+    adminAccountLabel_ = makeLabel(QStringLiteral("未登录"),
+                                   QStringLiteral("muted"), admin);
+    auto* logoutButton = new QPushButton(QStringLiteral("退出登录"), admin);
+    logoutButton->setObjectName(QStringLiteral("secondaryButton"));
+    connect(logoutButton, &QPushButton::clicked,
+            this, &MainWindow::logoutRequested);
+    adminLayout->addWidget(adminNameLabel_);
+    adminLayout->addWidget(adminAccountLabel_);
+    adminLayout->addSpacing(8);
+    adminLayout->addWidget(logoutButton);
+    refreshAdminInfo();
     layout->addWidget(admin);
 
     return sidebar;
@@ -482,4 +499,17 @@ void MainWindow::setConnectionState(const QString& state, const QString& text)
     connectionButton_->setText(state == QStringLiteral("online")
                                    ? QStringLiteral("检测连接")
                                    : QStringLiteral("重新连接"));
+}
+
+void MainWindow::refreshAdminInfo()
+{
+    if (!adminNameLabel_ || !adminAccountLabel_) {
+        return;
+    }
+    adminNameLabel_->setText(session_->isAuthenticated()
+        ? session_->displayName()
+        : QStringLiteral("管理员"));
+    adminAccountLabel_->setText(session_->isAuthenticated()
+        ? QStringLiteral("账号：%1").arg(session_->account())
+        : QStringLiteral("未登录"));
 }

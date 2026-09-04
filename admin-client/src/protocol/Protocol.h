@@ -1,7 +1,7 @@
 #pragma once
 
-// 这是与成员 2 当前实现同构的协议草案。
-// framing、消息外壳、action 和错误码最终以成员 1 冻结版本为准。
+// 与成员 2 客户端采用相同 framing 和消息外壳。
+// 管理员认证约定同步记录在 docs/admin-protocol.md。
 
 #include <QJsonObject>
 #include <QString>
@@ -11,7 +11,7 @@ namespace protocol {
 
 namespace action {
 inline constexpr const char* kPing = "PING";
-// 管理员业务 action 暂不在客户端单方面命名。
+inline constexpr const char* kAdminLogin = "admin.login";
 } // namespace action
 
 inline constexpr int kFrameLengthPrefixBytes = 4;
@@ -20,6 +20,9 @@ inline constexpr int kDefaultRequestTimeoutMs = 10 * 1000;
 
 enum ErrorCode {
     CodeOk = 0,
+    CodeBadRequest = 1001,
+    CodeNotLoggedIn = 1003,
+    CodeInvalidAdminCredentials = 1101,
     CodeServerError = 5000,
 };
 
@@ -71,6 +74,12 @@ inline QString describeError(int code, const QString& serverMessage = {})
         return QStringLiteral("请求超时，请稍后重试");
     case CodeBadPayload:
         return QStringLiteral("服务器响应格式异常");
+    case CodeBadRequest:
+        return serverMessage.isEmpty() ? QStringLiteral("提交的参数不正确") : serverMessage;
+    case CodeNotLoggedIn:
+        return QStringLiteral("登录状态已失效，请重新登录");
+    case CodeInvalidAdminCredentials:
+        return QStringLiteral("管理员账号或密码错误");
     case CodeServerError:
         return serverMessage.isEmpty() ? QStringLiteral("服务器内部错误") : serverMessage;
     default:

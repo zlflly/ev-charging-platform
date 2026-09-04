@@ -5,6 +5,7 @@
 
 class QLabel;
 class NetworkClient;
+class AdminSession;
 class QPushButton;
 class QStackedWidget;
 class QWidget;
@@ -14,7 +15,12 @@ class MainWindow final : public QMainWindow
     Q_OBJECT
 
 public:
-    explicit MainWindow(QWidget* parent = nullptr);
+    explicit MainWindow(NetworkClient* network,
+                        AdminSession* session,
+                        QWidget* parent = nullptr);
+
+signals:
+    void logoutRequested();
 
 private:
     QWidget* createSidebar();
@@ -39,13 +45,17 @@ private:
     void sendPing();
     void updateClock();
     void setConnectionState(const QString& state, const QString& text);
+    void refreshAdminInfo();
 
     NetworkClient* network_ = nullptr;
+    AdminSession* session_ = nullptr;
     QStackedWidget* pages_ = nullptr;
     QLabel* pageTitle_ = nullptr;
     QLabel* pageSubtitle_ = nullptr;
     QLabel* clockLabel_ = nullptr;
     QLabel* connectionBadge_ = nullptr;
+    QLabel* adminNameLabel_ = nullptr;
+    QLabel* adminAccountLabel_ = nullptr;
     QPushButton* connectionButton_ = nullptr;
     QList<QPushButton*> navigationButtons_;
 };

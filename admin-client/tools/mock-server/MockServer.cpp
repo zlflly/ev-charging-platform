@@ -36,12 +36,14 @@ public:
         connect(&server_, &QTcpServer::newConnection, this, [this] {
             while (auto* socket = server_.nextPendingConnection()) {
                 buffers_.insert(socket, QByteArray{});
+                adminIds_.insert(socket, 0);
                 connect(socket, &QTcpSocket::readyRead, this, [this, socket] {
                     buffers_[socket].append(socket->readAll());
                     process(socket);
                 });
                 connect(socket, &QTcpSocket::disconnected, this, [this, socket] {
                     buffers_.remove(socket);
+                    adminIds_.remove(socket);
                     socket->deleteLater();
                 });
             }
@@ -90,6 +92,29 @@ private:
         };
         if (action == QString::fromUtf8(protocol::action::kPing)) {
             response.insert(QStringLiteral("data"), requestData);
+        } else if (action == QString::fromUtf8(protocol::action::kAdminLogin)) {
+            const QString account =
+                requestData.value(QStringLiteral("account")).toString().trimmed();
+            const QString password =
+                requestData.value(QStringLiteral("password")).toString();
+            if (account.isEmpty() || password.isEmpty()) {
+                response.insert(QStringLiteral("code"), protocol::CodeBadRequest);
+                response.insert(QStringLiteral("message"),
+                                QStringLiteral("account and password are required"));
+            } else if (account != QStringLiteral("admin")
+                       || password != QStringLiteral("123456")) {
+                response.insert(QStringLiteral("code"),
+                                protocol::CodeInvalidAdminCredentials);
+                response.insert(QStringLiteral("message"),
+                                QStringLiteral("invalid administrator credentials"));
+            } else {
+                adminIds_[socket] = 1;
+                response.insert(QStringLiteral("data"), QJsonObject {
+                    {QStringLiteral("adminId"), 1},
+                    {QStringLiteral("account"), QStringLiteral("admin")},
+                    {QStringLiteral("displayName"), QStringLiteral("系统管理员")},
+                });
+            }
         } else {
             response.insert(QStringLiteral("code"), 1001);
             response.insert(QStringLiteral("message"), QStringLiteral("unsupported action"));
@@ -109,6 +134,7 @@ private:
 
     QTcpServer server_;
     QHash<QTcpSocket*, QByteArray> buffers_;
+    QHash<QTcpSocket*, qint64> adminIds_;
 };
 
 } // namespace

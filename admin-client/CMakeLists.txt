@@ -10,7 +10,10 @@ find_package(Qt6 REQUIRED COMPONENTS Core Network Widgets)
 
 qt_add_executable(admin-client
     src/main.cpp
+    src/app/ApplicationController.cpp
+    src/api/AdminApiClient.cpp
     src/net/NetworkClient.cpp
+    src/session/AdminSession.cpp
     src/ui/LoginWindow.cpp
     src/ui/MainWindow.cpp
     src/ui/widgets/EntityTableView.cpp
@@ -22,6 +25,12 @@ target_link_libraries(admin-client PRIVATE
     Qt6::Core
     Qt6::Network
     Qt6::Widgets
+)
+
+qt_add_resources(admin-client "admin-client-resources"
+    PREFIX "/"
+    FILES
+        resources/admin-login-hero.png
 )
 
 # 成员 1 的服务端就绪前，仅用于验证 framing、requestId 和并发响应匹配。
@@ -37,3 +46,10 @@ qt_add_executable(admin-network-smoke-test
 )
 target_include_directories(admin-network-smoke-test PRIVATE src)
 target_link_libraries(admin-network-smoke-test PRIVATE Qt6::Core Qt6::Network)
+
+qt_add_executable(admin-auth-smoke-test
+    tests/AdminAuthSmokeTest.cpp
+    src/net/NetworkClient.cpp
+)
+target_include_directories(admin-auth-smoke-test PRIVATE src)
+target_link_libraries(admin-auth-smoke-test PRIVATE Qt6::Core Qt6::Network)
