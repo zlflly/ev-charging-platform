@@ -13,6 +13,9 @@ struct RouteStep
 {
     QString instruction;
     QString roadName;
+    QString orientation;
+    QString action;
+    QString assistantAction;
     double distanceMeters = 0.0;
     qint64 durationSeconds = 0;
     QList<QPointF> path;

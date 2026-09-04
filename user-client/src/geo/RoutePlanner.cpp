@@ -181,6 +181,9 @@ void RoutePlanner::onReplyFinished()
         RouteStep routeStep;
         routeStep.instruction = step.value(QStringLiteral("instruction")).toString();
         routeStep.roadName = step.value(QStringLiteral("road")).toString();
+        routeStep.orientation = step.value(QStringLiteral("orientation")).toString();
+        routeStep.action = step.value(QStringLiteral("action")).toString();
+        routeStep.assistantAction = step.value(QStringLiteral("assistant_action")).toString();
         routeStep.distanceMeters = jsonNumber(step.value(QStringLiteral("distance")));
         routeStep.durationSeconds = jsonInteger(step.value(QStringLiteral("duration")));
         appendPolyline(step.value(QStringLiteral("polyline")).toString(),

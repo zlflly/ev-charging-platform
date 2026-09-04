@@ -8,6 +8,12 @@
     .amap-logo, .amap-copyright { opacity: .55; }
     .station-node { width: 18px; height: 18px; border: 4px solid white; border-radius: 50%; background: #149b68; box-shadow: 0 3px 10px rgba(20,36,58,.18); }
     .station-node.busy { background: #b66b08; }
+    .route-origin { width: 34px; height: 34px; border: 3px solid white; border-radius: 50%; background: #176cff; box-shadow: 0 8px 24px rgba(23,108,255,.28); position: relative; }
+    .route-origin::after { content: ''; position: absolute; left: 10px; top: 7px; width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 18px solid white; transform: rotate(42deg); }
+    .route-destination { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+    .route-destination__pin { width: 34px; height: 34px; border: 3px solid white; border-radius: 50% 50% 50% 0; background: #149b68; transform: rotate(-45deg); box-shadow: 0 8px 24px rgba(20,155,104,.25); display: grid; place-items: center; }
+    .route-destination__pin svg { width: 18px; height: 18px; transform: rotate(45deg); }
+    .route-destination__label { max-width: 190px; overflow: hidden; text-overflow: ellipsis; padding: 7px 10px; background: white; color: #14243a; border-radius: 10px; font: 600 12px/1.25 "Noto Sans CJK SC", "Microsoft YaHei UI", sans-serif; box-shadow: 0 8px 24px rgba(20,36,58,.14); }
   </style>
   <script>window._AMapSecurityConfig = { securityJsCode: '__AMAP_SECRET__' };</script>
   <script src="https://webapi.amap.com/maps?v=2.0&key=__AMAP_KEY__"></script>
@@ -24,6 +30,7 @@
   });
   let stationMarkers = [];
   let routeLine = null;
+  let routeMarkers = [];
 
   window.setCenter = (lat, lng) => {
     map.setZoomAndCenter(14, [Number(lng), Number(lat)], false, 300);
@@ -44,13 +51,32 @@
     if (stationMarkers.length) map.setFitView(stationMarkers, false, [42,42,42,42], 15);
   };
 
-  window.setRoute = (points) => {
+  window.setRoute = (payload) => {
     if (routeLine) map.remove(routeLine);
+    map.remove(routeMarkers);
+    routeMarkers = [];
+    const points = payload && payload.points ? payload.points : [];
     const path = (points || []).map((p) => [p.lng, p.lat]);
     if (!path.length) return;
-    routeLine = new AMap.Polyline({ path, strokeColor: '#176CFF', strokeWeight: 7, strokeOpacity: .95, lineJoin: 'round' });
+    routeLine = new AMap.Polyline({ path, strokeColor: '#176CFF', strokeWeight: 8, strokeOpacity: .96, lineJoin: 'round', showDir: true });
     map.add(routeLine);
-    map.setFitView([routeLine], false, [52,34,52,34], 16);
+    const origin = new AMap.Marker({
+      position: path[0],
+      content: '<div class="route-origin"></div>',
+      offset: new AMap.Pixel(-20, -20),
+      zIndex: 120
+    });
+    const label = String(payload.destination || '充电站').replace(/[&<>'"]/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+    const destination = new AMap.Marker({
+      position: path[path.length - 1],
+      content: `<div class="route-destination"><div class="route-destination__pin"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="white" d="M13.2 2 5.5 13h5L9.8 22l8.7-12h-5.2z"/></svg></div><div class="route-destination__label">${label}</div></div>`,
+      offset: new AMap.Pixel(-20, -42),
+      zIndex: 120
+    });
+    origin.setMap(map);
+    destination.setMap(map);
+    routeMarkers = [origin, destination];
+    map.setFitView([routeLine, ...routeMarkers], false, [90,48,64,48], 16);
   };
 </script>
 </body>

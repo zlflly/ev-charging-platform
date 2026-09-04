@@ -36,7 +36,24 @@ inline QString globalStyleSheet()
         QLabel#StatusInfo { color: #1558C7; background: #EAF1FF; border-radius: 9px; padding: 3px 8px; font-weight: 650; }
         QFrame#Surface { background: #FFFFFF; border-radius: 16px; }
         QFrame#SoftSurface { background: #EAF1FF; border-radius: 16px; }
+        QFrame#RouteInstructionCard { background: #FFFFFF; border-radius: 16px; }
+        QFrame#NavigationStatsCard { background: #FFFFFF; border-radius: 14px; }
+        QFrame#NavigationPanel { background: #FFFFFF; border-radius: 22px; }
+        QFrame#NavigationHandle { background: #B9C8D2; border-radius: 2px; min-height: 4px; max-height: 4px; }
         QFrame#Divider { background: #DCE5E8; min-height: 1px; max-height: 1px; }
+        QFrame#VerticalDivider { background: #DCE5E8; min-width: 1px; max-width: 1px; }
+        QLabel#NavigationHeader { font-size: 20px; font-weight: 700; }
+        QLabel#NavigationStepLead { color: #43566E; font-size: 14px; }
+        QLabel#NavigationRoad { color: #14243A; font-size: 20px; font-weight: 700; }
+        QLabel#MapSummaryDuration { color: #176CFF; font-size: 27px; font-weight: 750; }
+        QLabel#MapSummaryDistance { color: #14243A; font-size: 14px; font-weight: 650; }
+        QLabel#MapSummaryLabel { color: #647487; font-size: 11px; }
+        QLabel#MapSummaryEta { color: #14243A; font-size: 18px; font-weight: 700; }
+        QLabel#NavigationStationTitle { color: #14243A; font-size: 18px; font-weight: 700; }
+        QLabel#NavigationStationMeta { color: #647487; font-size: 12px; }
+        QLabel#NavigationMetricLabel { color: #647487; font-size: 11px; }
+        QLabel#NavigationMetricValue { color: #14243A; font-size: 18px; font-weight: 700; }
+        QLabel#NavigationMetricValueGreen { color: #149B68; font-size: 18px; font-weight: 700; }
         QLineEdit { background: #FFFFFF; border: 1px solid #DCE5E8; border-radius: 14px; padding: 0 15px; min-height: 50px; font-size: 15px; selection-background-color: #176CFF; }
         QLineEdit:focus { border: 2px solid #176CFF; padding: 0 13px; }
         QPushButton { border: none; border-radius: 14px; min-height: 50px; padding: 0 18px; font-size: 15px; font-weight: 650; }
@@ -48,6 +65,8 @@ inline QString globalStyleSheet()
         QPushButton#Secondary:hover { background: #DDE9FF; }
         QPushButton#Quiet { background: transparent; color: #1558C7; padding: 0 8px; }
         QPushButton#Danger { background: #FDEAEA; color: #B83C3C; }
+        QPushButton#NavigationSecondary { background: #FFFFFF; color: #176CFF; border: 1px solid #176CFF; }
+        QPushButton#NavigationSecondary:hover { background: #EAF1FF; }
         QScrollArea { border: none; background: transparent; }
         QScrollArea > QWidget > QWidget { background: transparent; }
         QScrollBar:vertical { background: transparent; width: 6px; margin: 2px; }

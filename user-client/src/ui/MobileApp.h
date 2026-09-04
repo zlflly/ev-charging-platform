@@ -1,5 +1,6 @@
 #pragma once
 
+#include "geo/RoutePlanner.h"
 #include "model/Order.h"
 #include "model/Station.h"
 
@@ -11,7 +12,6 @@
 
 class Geocoder;
 class NetworkClient;
-class RoutePlanner;
 class QButtonGroup;
 class QFrame;
 class QLabel;
@@ -20,7 +20,6 @@ class QPushButton;
 class QStackedWidget;
 class QVBoxLayout;
 class QWebEngineView;
-struct RouteResult;
 
 class EnergyMapWidget final : public QWidget
 {
@@ -28,10 +27,12 @@ public:
     explicit EnergyMapWidget(QWidget* parent = nullptr);
     void setStations(const QList<StationInfo>& stations);
     void setCaption(const QString& caption);
+    void setRoute(const RouteResult& route);
 protected:
     void paintEvent(QPaintEvent*) override;
 private:
     QList<StationInfo> stations_;
+    QList<QPointF> routePath_;
     QString caption_ = QStringLiteral("输入位置，查找附近站点");
 };
 
@@ -74,13 +75,26 @@ private:
     QColor background_;
 };
 
+class RouteTurnGlyph final : public QWidget
+{
+public:
+    explicit RouteTurnGlyph(bool compact = false, QWidget* parent = nullptr);
+    void setManeuver(const QString& maneuver, bool active = true);
+protected:
+    void paintEvent(QPaintEvent*) override;
+private:
+    QString maneuver_ = QStringLiteral("straight");
+    bool active_ = true;
+    bool compact_ = false;
+};
+
 class AmapWidget final : public QWidget
 {
 public:
     explicit AmapWidget(QWidget* parent = nullptr);
     void setStations(const QList<StationInfo>& stations);
     void setCenter(double latitude, double longitude, const QString& label);
-    void setRoute(const RouteResult& route);
+    void setRoute(const RouteResult& route, const QString& destinationLabel = QString());
     bool usesLiveMap() const { return liveMap_; }
 private:
     void runScript(const QString& script);
@@ -123,6 +137,8 @@ private:
     void renderStationDetail(const StationDetail& detail);
     void showChargerDetail(const ChargerInfo& charger);
     void showNavigation();
+    void applyNavigationRoute(const RouteResult& route);
+    void updateNavigationStep(int index);
     void requestActiveOrder(Page destination = ChargingPage);
     void renderOrder(const OrderInfo& order);
     void reserveCharger(const ChargerInfo& charger);
@@ -186,11 +202,24 @@ private:
     QPushButton* reserveButton_ = nullptr;
 
     AmapWidget* navigationMap_ = nullptr;
+    RouteTurnGlyph* navigationTurnGlyph_ = nullptr;
+    QLabel* navigationStepLead_ = nullptr;
+    QLabel* navigationRoad_ = nullptr;
     QLabel* navigationTarget_ = nullptr;
+    QLabel* navigationStationMeta_ = nullptr;
+    QLabel* navigationStatus_ = nullptr;
+    QLabel* navigationAvailability_ = nullptr;
+    QLabel* navigationPrice_ = nullptr;
+    QLabel* navigationMapEta_ = nullptr;
+    QLabel* navigationEta_ = nullptr;
+    QLabel* navigationEtaHint_ = nullptr;
     QLabel* navigationDistance_ = nullptr;
     QLabel* navigationDuration_ = nullptr;
     QLabel* navigationNotice_ = nullptr;
+    QPushButton* navigationEndAction_ = nullptr;
     QPushButton* navigationAction_ = nullptr;
+    RouteResult navigationRoute_;
+    int navigationStepIndex_ = 0;
 
     ChargeGauge* gauge_ = nullptr;
     QLabel* chargingStatus_ = nullptr;
