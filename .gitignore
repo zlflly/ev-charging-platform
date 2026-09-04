@@ -47,3 +47,26 @@ admin-client
 *.log
 *.tmp
 mock-state.json
+
+# Documentation (generated or notes)
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Test artifacts
+test_output/
+test_results/
+
+# Python (for ML integration)
+__pycache__/
+*.py[cod]
+*.so
+.Python
+venv/
+ENV/
+.venv
+
+# Editor backup
+*.bak
+*.orig
