@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QDateTime>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QString>
 
@@ -42,6 +43,11 @@ struct OrderInfo
     double amount = 0.0;
     double electricityFee = 0.0;
     double serviceFee = 0.0;
+    double voltageV = 0.0;
+    double currentA = 0.0;
+    qint64 remainingSeconds = 0;
+    QList<double> powerTrend;
+    QList<double> energyTrend;
 
     bool valid() const { return orderId > 0 && !status.isEmpty(); }
 
@@ -108,6 +114,16 @@ struct OrderInfo
         order.amount = json.value(QStringLiteral("amount")).toDouble();
         order.electricityFee = json.value(QStringLiteral("electricityFee")).toDouble();
         order.serviceFee = json.value(QStringLiteral("serviceFee")).toDouble();
+        order.voltageV = json.value(QStringLiteral("voltageV")).toDouble();
+        order.currentA = json.value(QStringLiteral("currentA")).toDouble();
+        order.remainingSeconds = static_cast<qint64>(
+            json.value(QStringLiteral("remainingSeconds")).toDouble());
+        for (const QJsonValue& value : json.value(QStringLiteral("powerTrend")).toArray()) {
+            order.powerTrend.append(value.toDouble());
+        }
+        for (const QJsonValue& value : json.value(QStringLiteral("energyTrend")).toArray()) {
+            order.energyTrend.append(value.toDouble());
+        }
         return order;
     }
 };

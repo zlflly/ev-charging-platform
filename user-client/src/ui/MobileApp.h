@@ -6,6 +6,8 @@
 #include <QMainWindow>
 #include <QPointer>
 #include <QStringList>
+#include <QVector>
+#include <QColor>
 
 class Geocoder;
 class NetworkClient;
@@ -44,6 +46,32 @@ private:
     double percent_ = 0.0;
     QString centerText_ = QStringLiteral("—");
     QString caption_ = QStringLiteral("等待订单");
+};
+
+class SparklineWidget final : public QWidget
+{
+public:
+    explicit SparklineWidget(const QColor& color, QWidget* parent = nullptr);
+    void setSamples(const QList<double>& samples);
+protected:
+    void paintEvent(QPaintEvent*) override;
+private:
+    QColor color_;
+    QVector<double> samples_;
+};
+
+class MetricGlyphWidget final : public QWidget
+{
+public:
+    enum Kind { Battery, Bolt, Clock, Coin };
+    MetricGlyphWidget(Kind kind, const QColor& color, const QColor& background,
+                      QWidget* parent = nullptr);
+protected:
+    void paintEvent(QPaintEvent*) override;
+private:
+    Kind kind_;
+    QColor color_;
+    QColor background_;
 };
 
 class AmapWidget final : public QWidget
@@ -89,8 +117,9 @@ private:
     void attemptLogin();
     void locateAddress();
     void requestNearbyStations();
-    void requestStationDetail(qint64 stationId);
+    void requestStationDetail(qint64 stationId, bool navigateAfter = false);
     void renderStationList(const QList<StationInfo>& stations);
+    void applyHomeFilter();
     void renderStationDetail(const StationDetail& detail);
     void showChargerDetail(const ChargerInfo& charger);
     void showNavigation();
@@ -119,25 +148,40 @@ private:
     QLineEdit* addressInput_ = nullptr;
     QPushButton* locateButton_ = nullptr;
     QLabel* homeNotice_ = nullptr;
+    QLabel* homeRouteSummary_ = nullptr;
     AmapWidget* mapWidget_ = nullptr;
     QWidget* stationListBody_ = nullptr;
     QVBoxLayout* stationListLayout_ = nullptr;
+    QList<StationInfo> nearbyStations_;
+    int homeFilter_ = 0;
+    qint64 nearestStationId_ = 0;
+    bool navigateAfterDetail_ = false;
 
     QLabel* detailName_ = nullptr;
     QLabel* detailMeta_ = nullptr;
     QLabel* detailAddress_ = nullptr;
     QLabel* detailPrice_ = nullptr;
     QLabel* detailAvailability_ = nullptr;
+    QLabel* detailTotal_ = nullptr;
+    QLabel* detailFast_ = nullptr;
+    QLabel* detailSlow_ = nullptr;
     QLabel* detailNotice_ = nullptr;
     QWidget* chargerListBody_ = nullptr;
     QVBoxLayout* chargerListLayout_ = nullptr;
     StationDetail currentStation_;
     ChargerInfo currentCharger_;
+    ChargerInfo preferredCharger_;
 
     QLabel* chargerCode_ = nullptr;
+    QLabel* chargerStationLabel_ = nullptr;
     QLabel* chargerStatus_ = nullptr;
+    QLabel* chargerHint_ = nullptr;
     QLabel* chargerPower_ = nullptr;
     QLabel* chargerMeta_ = nullptr;
+    QLabel* chargerPrice_ = nullptr;
+    QLabel* chargerLocation_ = nullptr;
+    QLabel* chargerMethod_ = nullptr;
+    QLabel* chargerStateSpec_ = nullptr;
     QLabel* chargerNotice_ = nullptr;
     QPushButton* reserveButton_ = nullptr;
 
@@ -152,7 +196,23 @@ private:
     QLabel* chargingStatus_ = nullptr;
     QLabel* chargingStation_ = nullptr;
     QLabel* chargingMetrics_ = nullptr;
+    QLabel* chargingStart_ = nullptr;
+    QLabel* chargingMode_ = nullptr;
+    QLabel* chargingStateText_ = nullptr;
     QLabel* chargingAmount_ = nullptr;
+    QLabel* chargingPowerLive_ = nullptr;
+    QLabel* chargingEnergyLive_ = nullptr;
+    QLabel* chargingDuration_ = nullptr;
+    QLabel* chargingRemaining_ = nullptr;
+    QLabel* chargingFeeSummary_ = nullptr;
+    QLabel* chargingEnergyTile_ = nullptr;
+    QLabel* chargingPowerTile_ = nullptr;
+    QLabel* chargingDurationTile_ = nullptr;
+    QLabel* chargingFeeTile_ = nullptr;
+    QLabel* chargingElectrical_ = nullptr;
+    SparklineWidget* powerWave_ = nullptr;
+    SparklineWidget* energyWave_ = nullptr;
+    QPushButton* chargingOrderButton_ = nullptr;
     QLabel* chargingNotice_ = nullptr;
     QPushButton* chargingAction_ = nullptr;
     OrderInfo activeOrder_;

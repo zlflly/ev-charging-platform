@@ -19,10 +19,12 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
 #include <QAbstractButton>
 #include <QButtonGroup>
+#include <QCheckBox>
 #include <QDateTime>
 #include <QDoubleValidator>
 #include <QFile>
 #include <QFrame>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -42,6 +44,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 #include <QWebEngineView>
 #include <QtMath>
 #include <initializer_list>
+#include <algorithm>
 
 namespace {
 
@@ -103,6 +106,15 @@ QString durationText(qint64 durationMs)
 {
     const qint64 minutes = qMax<qint64>(0, durationMs / 60000);
     return QStringLiteral("%1小时%2分").arg(minutes / 60).arg(minutes % 60, 2, 10, QLatin1Char('0'));
+}
+
+QString clockDurationText(qint64 durationMs)
+{
+    const qint64 totalSeconds = qMax<qint64>(0, durationMs / 1000);
+    return QStringLiteral("%1:%2:%3")
+        .arg(totalSeconds / 3600, 2, 10, QLatin1Char('0'))
+        .arg((totalSeconds / 60) % 60, 2, 10, QLatin1Char('0'))
+        .arg(totalSeconds % 60, 2, 10, QLatin1Char('0'));
 }
 
 OrderInfo orderFromPayload(const QJsonObject& payload)
@@ -298,7 +310,7 @@ void AmapWidget::setRoute(const RouteResult& route)
 
 ChargeGauge::ChargeGauge(QWidget* parent) : QWidget(parent)
 {
-    setMinimumSize(270, 270);
+    setMinimumSize(210, 210);
 }
 
 void ChargeGauge::setValue(double percent, const QString& centerText, const QString& caption)
@@ -313,15 +325,72 @@ void ChargeGauge::paintEvent(QPaintEvent*)
 {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
-    const qreal side = qMin(width(), height()) - 36;
+    const qreal side = qMin(width(), height()) - 30;
     const QRectF ring((width()-side)/2, (height()-side)/2, side, side);
-    QPen base(QColor("#DFE8E8"), 15, Qt::SolidLine, Qt::RoundCap); p.setPen(base); p.drawArc(ring, 225*16, -270*16);
-    QPen live(QColor(Theme::Green), 15, Qt::SolidLine, Qt::RoundCap); p.setPen(live); p.drawArc(ring, 225*16, int(-270*16*percent_/100.0));
+    QPen base(QColor("#DFE8F2"), 14, Qt::SolidLine, Qt::RoundCap); p.setPen(base); p.drawEllipse(ring);
+    QConicalGradient gradient(ring.center(), 90);
+    gradient.setColorAt(0.0, QColor(Theme::Blue));
+    gradient.setColorAt(0.72, QColor("#2A8BFF"));
+    gradient.setColorAt(0.88, QColor("#10B96B"));
+    gradient.setColorAt(1.0, QColor(Theme::Blue));
+    QPen live(QBrush(gradient), 14, Qt::SolidLine, Qt::RoundCap);
+    p.setPen(live);
+    p.drawArc(ring, 90*16, int(-360*16*percent_/100.0));
     p.setPen(QColor(Theme::Ink));
-    QFont f = font(); f.setPixelSize(40); f.setWeight(QFont::Bold); p.setFont(f);
-    p.drawText(rect().adjusted(0,58,0,-60), Qt::AlignCenter, centerText_);
-    f.setPixelSize(12); f.setWeight(QFont::Normal); p.setFont(f); p.setPen(QColor(Theme::Muted));
-    p.drawText(rect().adjusted(0,105,0,-35), Qt::AlignCenter, caption_);
+    QFont f = font(); f.setPixelSize(38); f.setWeight(QFont::Bold); p.setFont(f);
+    p.drawText(rect().adjusted(0,48,0,-58), Qt::AlignCenter, centerText_);
+    f.setPixelSize(12); f.setWeight(QFont::DemiBold); p.setFont(f); p.setPen(QColor(Theme::Blue));
+    p.drawText(rect().adjusted(0,94,0,-28), Qt::AlignCenter, caption_);
+}
+
+SparklineWidget::SparklineWidget(const QColor& color, QWidget* parent)
+    : QWidget(parent), color_(color)
+{
+    setFixedHeight(34);
+}
+
+void SparklineWidget::setSamples(const QList<double>& samples)
+{
+    samples_.clear();
+    for (double value : samples) samples_.append(value);
+    update();
+}
+
+void SparklineWidget::paintEvent(QPaintEvent*)
+{
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing);
+    const QRectF area = rect().adjusted(2,3,-2,-3);
+    if (samples_.size() < 2) {
+        QPen empty(QColor("#C9D6E7"), 1.5, Qt::DashLine);
+        p.setPen(empty);
+        p.drawLine(area.left(), area.center().y(), area.right(), area.center().y());
+        return;
+    }
+    const auto [minIt,maxIt] = std::minmax_element(samples_.cbegin(),samples_.cend());
+    const double minValue=*minIt, maxValue=*maxIt;
+    const double range=qMax(0.001,maxValue-minValue);
+    QPainterPath line;
+    for(int i=0;i<samples_.size();++i){const qreal x=area.left()+area.width()*i/(samples_.size()-1);const qreal y=area.bottom()-area.height()*(samples_[i]-minValue)/range;if(i==0)line.moveTo(x,y);else line.lineTo(x,y);}
+    QPainterPath fill=line;fill.lineTo(area.right(),area.bottom());fill.lineTo(area.left(),area.bottom());fill.closeSubpath();
+    QLinearGradient shade(0,area.top(),0,area.bottom());QColor top=color_;top.setAlpha(70);QColor bottom=color_;bottom.setAlpha(0);shade.setColorAt(0,top);shade.setColorAt(1,bottom);p.fillPath(fill,shade);
+    p.setPen(QPen(color_,2,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));p.drawPath(line);
+}
+
+MetricGlyphWidget::MetricGlyphWidget(Kind kind, const QColor& color,
+                                     const QColor& background, QWidget* parent)
+    : QWidget(parent), kind_(kind), color_(color), background_(background)
+{
+    setFixedSize(44,44);
+}
+
+void MetricGlyphWidget::paintEvent(QPaintEvent*)
+{
+    QPainter p(this);p.setRenderHint(QPainter::Antialiasing);p.setPen(Qt::NoPen);p.setBrush(background_);p.drawEllipse(rect());p.setPen(QPen(color_,2.4,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));p.setBrush(Qt::NoBrush);const QPointF c=rect().center();
+    if(kind_==Battery){p.drawRoundedRect(QRectF(c.x()-8,c.y()-11,16,22),3,3);p.drawLine(c.x()-3,c.y()-14,c.x()+3,c.y()-14);p.drawLine(c.x(),c.y()-6,c.x(),c.y()+6);p.drawLine(c.x()-4,c.y(),c.x()+4,c.y());}
+    else if(kind_==Bolt){QPainterPath path;path.moveTo(c.x()+1,c.y()-12);path.lineTo(c.x()-7,c.y()+1);path.lineTo(c.x()-1,c.y()+1);path.lineTo(c.x()-4,c.y()+12);path.lineTo(c.x()+8,c.y()-3);path.lineTo(c.x()+2,c.y()-3);path.closeSubpath();p.fillPath(path,color_);}
+    else if(kind_==Clock){p.drawEllipse(QRectF(c.x()-10,c.y()-10,20,20));p.drawLine(c,c+QPointF(0,-6));p.drawLine(c,c+QPointF(6,3));}
+    else {p.drawEllipse(QRectF(c.x()-10,c.y()-10,20,20));QFont f=font();f.setPixelSize(20);f.setWeight(QFont::Bold);p.setFont(f);p.drawText(rect(),Qt::AlignCenter,QStringLiteral("¥"));}
 }
 
 MobileApp::MobileApp(NetworkClient* network, QWidget* parent)
@@ -398,7 +467,44 @@ MobileApp::MobileApp(NetworkClient* network, QWidget* parent)
             Session::instance().longitude(), Session::instance().locationLabel());
     }
     const QString previewPage = qEnvironmentVariable("EV_PREVIEW_PAGE");
-    if (Session::instance().isLoggedIn() && previewPage == QStringLiteral("charging")) {
+    if (Session::instance().isLoggedIn() && previewPage == QStringLiteral("home")) {
+        QList<StationInfo> stations;
+        for (int i = 0; i < 3; ++i) {
+            StationInfo station;
+            station.stationId = i + 1;
+            station.name = i == 0 ? QStringLiteral("北理良乡南门充电站")
+                : i == 1 ? QStringLiteral("北理良乡充电站 A-002")
+                         : QStringLiteral("良乡大学城充电站");
+            station.pricePerKwh = i < 2 ? 1.28 : 1.36;
+            station.totalChargers = i == 0 ? 5 : i == 1 ? 4 : 6;
+            station.availableChargers = i == 0 ? 2 : i == 1 ? 1 : 0;
+            station.distanceKm = i == 0 ? 1.2 : i == 1 ? 1.6 : 2.3;
+            station.latitude = appConfig::kPreviewStationLatitude + i * 0.002;
+            station.longitude = appConfig::kPreviewStationLongitude + i * 0.002;
+            stations.append(station);
+        }
+        renderStationList(stations);
+        showPage(HomePage);
+    } else if (Session::instance().isLoggedIn() && previewPage == QStringLiteral("charging")) {
+        activeOrder_.orderId = 2026090401;
+        activeOrder_.status = QStringLiteral("CHARGING");
+        activeOrder_.stationName = QStringLiteral("北理良乡南门充电站");
+        activeOrder_.chargerId = 11;
+        activeOrder_.chargerCode = QStringLiteral("A-001");
+        activeOrder_.chargerType = protocol::ChargerTypeFast;
+        activeOrder_.powerKw = 120.0;
+        activeOrder_.energyKwh = 32.60;
+        activeOrder_.targetEnergyKwh = 52.58;
+        activeOrder_.progressPercent = 62.0;
+        activeOrder_.estimatedAmount = 12.86;
+        activeOrder_.pricePerKwh = 1.28;
+        activeOrder_.startTimeMs = QDateTime::currentMSecsSinceEpoch() - 1716000;
+        activeOrder_.remainingSeconds = 4680;
+        activeOrder_.voltageV = 624;
+        activeOrder_.currentA = 192;
+        activeOrder_.powerTrend = {112,114,113,116,118,117,120,121};
+        activeOrder_.energyTrend = {18,20,23,25,27,29,31,32.6};
+        renderOrder(activeOrder_);
         showPage(ChargingPage);
     } else if (Session::instance().isLoggedIn() && previewPage == QStringLiteral("profile")) {
         showPage(ProfilePage);
@@ -449,20 +555,39 @@ MobileApp::MobileApp(NetworkClient* network, QWidget* parent)
 QWidget* MobileApp::buildLoginPage()
 {
     auto* page = new QWidget; page->setObjectName(QStringLiteral("Page"));
-    auto* layout = new QVBoxLayout(page); layout->setContentsMargins(28, 34, 28, 30); layout->setSpacing(16);
-    auto* brand = label(QStringLiteral("NEU · CHARGE"), "Muted"); brand->setStyleSheet(QStringLiteral("color:#176CFF;font-weight:700;letter-spacing:1px"));
-    connectionLabel_ = label(QStringLiteral("正在连接服务"), "StatusWarn"); connectionLabel_->setAlignment(Qt::AlignCenter); connectionLabel_->setFixedWidth(112);
-    auto* top = new QHBoxLayout; top->addWidget(brand); top->addStretch(); top->addWidget(connectionLabel_); layout->addLayout(top);
-    layout->addStretch(2);
+    auto* layout = new QVBoxLayout(page); layout->setContentsMargins(0,0,0,0); layout->setSpacing(0);
 
-    auto* marker = new QFrame; marker->setFixedSize(56, 6); marker->setStyleSheet(QStringLiteral("background:#176CFF;border-radius:3px")); layout->addWidget(marker);
-    auto* title = label(QStringLiteral("从更近的能源线路出发"), "PageTitle"); title->setStyleSheet(QStringLiteral("font-size:36px")); layout->addWidget(title);
-    layout->addWidget(label(QStringLiteral("手机号登录，新用户自动注册"), "Muted"));
-    layout->addSpacing(30);
-    phoneInput_ = new QLineEdit; phoneInput_->setPlaceholderText(QStringLiteral("请输入 11 位手机号")); phoneInput_->setMaxLength(11); phoneInput_->setInputMethodHints(Qt::ImhDigitsOnly); layout->addWidget(phoneInput_);
-    loginButton_ = button(QStringLiteral("登录 / 自动注册")); layout->addWidget(loginButton_);
-    loginNotice_ = label(QString(), "Muted"); loginNotice_->setMinimumHeight(36); layout->addWidget(loginNotice_);
-    layout->addStretch(3);
+    auto* hero = new QFrame; hero->setObjectName(QStringLiteral("LoginHero"));
+    hero->setMinimumHeight(430);
+    hero->setStyleSheet(QStringLiteral(
+        "QFrame#LoginHero{border-image:url(:/resources/login-hero-v2.png) 0 0 0 0 stretch stretch;}"));
+    auto* heroLayout = new QVBoxLayout(hero); heroLayout->setContentsMargins(28,24,28,24); heroLayout->setSpacing(10);
+    auto* brand = label(QStringLiteral("NEU · CHARGE"), "Muted"); brand->setStyleSheet(QStringLiteral("color:#176CFF;font-size:15px;font-weight:700;letter-spacing:2px"));
+    connectionLabel_ = label(QStringLiteral("正在连接服务"), "StatusWarn"); connectionLabel_->setAlignment(Qt::AlignCenter); connectionLabel_->setFixedWidth(112);
+    auto* top = new QHBoxLayout; top->addWidget(brand); top->addStretch(); top->addWidget(connectionLabel_); heroLayout->addLayout(top);
+    heroLayout->addSpacing(58);
+    auto* title = label(QStringLiteral("更近的能源线路<br>更<span style='color:#176CFF'>高效</span>的出发"));
+    title->setTextFormat(Qt::RichText); title->setStyleSheet(QStringLiteral("font-size:34px;font-weight:750;color:#14243A")); heroLayout->addWidget(title);
+    auto* marker = new QFrame; marker->setFixedSize(42,6); marker->setStyleSheet(QStringLiteral("background:#176CFF;border-radius:3px")); heroLayout->addWidget(marker);
+    heroLayout->addWidget(label(QStringLiteral("查找附近充电站，智能规划路线"), "Muted"));
+    heroLayout->addStretch();
+    layout->addWidget(hero);
+
+    auto* form = new QFrame; form->setObjectName(QStringLiteral("Surface"));
+    auto* formLayout = new QVBoxLayout(form); formLayout->setContentsMargins(24,20,24,18); formLayout->setSpacing(12);
+    auto* phoneRow = new QFrame; phoneRow->setStyleSheet(QStringLiteral("QFrame{background:#FFFFFF;border:1px solid #DCE5E8;border-radius:14px}"));
+    auto* phoneLayout = new QHBoxLayout(phoneRow); phoneLayout->setContentsMargins(14,0,8,0); phoneLayout->setSpacing(10);
+    auto* prefix = label(QStringLiteral("+86"), "SectionTitle"); prefix->setFixedWidth(44); phoneLayout->addWidget(prefix);
+    auto* divider = new QFrame; divider->setFixedSize(1,28); divider->setStyleSheet(QStringLiteral("background:#DCE5E8")); phoneLayout->addWidget(divider);
+    phoneInput_ = new QLineEdit; phoneInput_->setPlaceholderText(QStringLiteral("请输入 11 位手机号")); phoneInput_->setMaxLength(11); phoneInput_->setInputMethodHints(Qt::ImhDigitsOnly); phoneInput_->setStyleSheet(QStringLiteral("border:none;background:transparent")); phoneLayout->addWidget(phoneInput_,1); formLayout->addWidget(phoneRow);
+    loginButton_ = button(QStringLiteral("登录 / 自动注册")); formLayout->addWidget(loginButton_);
+    auto* consent = new QCheckBox(QStringLiteral("我已阅读并同意《用户服务协议》和《隐私政策》")); consent->setChecked(true); consent->setStyleSheet(QStringLiteral("QCheckBox{color:#647487;font-size:12px} QCheckBox::indicator{width:18px;height:18px}")); formLayout->addWidget(consent,0,Qt::AlignHCenter);
+    loginNotice_ = label(QString(), "Muted"); loginNotice_->setMinimumHeight(22); formLayout->addWidget(loginNotice_);
+    auto* benefits = new QHBoxLayout; benefits->setSpacing(0);
+    const QStringList benefitTexts{QStringLiteral("附近充电站\n快速找站"),QStringLiteral("智能路线规划\n导航直达"),QStringLiteral("便捷充电\n状态同步")};
+    for(const QString& text:benefitTexts){auto* item=label(text,"Muted");item->setAlignment(Qt::AlignCenter);item->setStyleSheet(QStringLiteral("color:#41536B;font-size:12px"));benefits->addWidget(item,1);} formLayout->addLayout(benefits);
+    layout->addWidget(form);
+    layout->addStretch();
     connect(loginButton_, &QPushButton::clicked, this, &MobileApp::attemptLogin);
     connect(phoneInput_, &QLineEdit::returnPressed, this, &MobileApp::attemptLogin);
     return page;
@@ -472,14 +597,17 @@ QWidget* MobileApp::buildHomePage()
 {
     auto* page = new QWidget; page->setObjectName(QStringLiteral("Page"));
     auto* outer = new QVBoxLayout(page); outer->setContentsMargins(0,0,0,0);
-    auto* scroll = new QScrollArea; scroll->setWidgetResizable(true); auto* body = new QWidget; auto* layout = new QVBoxLayout(body); layout->setContentsMargins(14,18,14,22); layout->setSpacing(10);
-    auto* titleRow = new QHBoxLayout; auto* texts = new QVBoxLayout; texts->setSpacing(2); texts->addWidget(label(QStringLiteral("附近充电站"), "PageTitle")); locationLabel_ = label(QStringLiteral("尚未设置位置"), "Muted"); texts->addWidget(locationLabel_); titleRow->addLayout(texts); titleRow->addStretch(); auto* refresh = button(QStringLiteral("刷新"), "Quiet"); refresh->setFixedWidth(58); titleRow->addWidget(refresh); layout->addLayout(titleRow);
+    auto* scroll = new QScrollArea; scroll->setWidgetResizable(true); auto* body = new QWidget; auto* layout = new QVBoxLayout(body); layout->setContentsMargins(16,18,16,20); layout->setSpacing(10);
+    auto* titleRow = new QHBoxLayout; auto* texts = new QVBoxLayout; texts->setSpacing(2); texts->addWidget(label(QStringLiteral("附近充电站"), "PageTitle")); locationLabel_ = label(QStringLiteral("尚未设置位置"), "Muted"); texts->addWidget(locationLabel_); titleRow->addLayout(texts); titleRow->addStretch(); auto* refresh = button(QStringLiteral("刷新"), "Secondary"); refresh->setFixedWidth(72); titleRow->addWidget(refresh); layout->addLayout(titleRow);
+    auto* filters = new QHBoxLayout; filters->setSpacing(7); const QStringList filterNames{QStringLiteral("距离优先"),QStringLiteral("价格优先"),QStringLiteral("有空闲")};
+    for(int i=0;i<filterNames.size();++i){auto* chip=button(filterNames[i],i==0?"Secondary":"Quiet");chip->setCheckable(true);chip->setChecked(i==0);chip->setMinimumHeight(38);filters->addWidget(chip,1);connect(chip,&QPushButton::clicked,this,[this,i]{homeFilter_=i;applyHomeFilter();});} layout->addLayout(filters);
     auto* search = new QHBoxLayout; search->setSpacing(8); addressInput_ = new QLineEdit; addressInput_->setPlaceholderText(QStringLiteral("输入城市、区域或详细地址")); locateButton_ = button(QStringLiteral("定位"), "Primary"); locateButton_->setFixedWidth(86); search->addWidget(addressInput_); search->addWidget(locateButton_); layout->addLayout(search);
     homeNotice_ = label(QString(), "Muted"); homeNotice_->hide(); layout->addWidget(homeNotice_);
-    mapWidget_ = new AmapWidget; layout->addWidget(mapWidget_);
-    auto* listTitle = new QHBoxLayout; listTitle->addWidget(label(QStringLiteral("沿线站点"), "SectionTitle")); listTitle->addStretch(); layout->addLayout(listTitle);
+    mapWidget_ = new AmapWidget; mapWidget_->setFixedHeight(205); layout->addWidget(mapWidget_);
+    auto* routeStrip = surface(); auto* routeLayout = new QHBoxLayout(routeStrip); routeLayout->setContentsMargins(16,10,10,10); homeRouteSummary_ = label(QStringLiteral("定位后显示最近路线"),"Muted"); routeLayout->addWidget(homeRouteSummary_,1); auto* viewRoute=button(QStringLiteral("查看路线"),"Quiet"); viewRoute->setFixedWidth(88); routeLayout->addWidget(viewRoute); layout->addWidget(routeStrip);
+    auto* listTitle = new QHBoxLayout; listTitle->addWidget(label(QStringLiteral("附近站点"), "SectionTitle")); listTitle->addStretch(); layout->addLayout(listTitle);
     stationListBody_ = new QWidget; stationListLayout_ = new QVBoxLayout(stationListBody_); stationListLayout_->setContentsMargins(0,0,0,0); stationListLayout_->setSpacing(10); layout->addWidget(stationListBody_); layout->addStretch(); scroll->setWidget(body); outer->addWidget(scroll);
-    connect(locateButton_, &QPushButton::clicked, this, &MobileApp::locateAddress); connect(addressInput_, &QLineEdit::returnPressed, this, &MobileApp::locateAddress); connect(refresh, &QPushButton::clicked, this, &MobileApp::requestNearbyStations);
+    connect(locateButton_, &QPushButton::clicked, this, &MobileApp::locateAddress); connect(addressInput_, &QLineEdit::returnPressed, this, &MobileApp::locateAddress); connect(refresh, &QPushButton::clicked, this, &MobileApp::requestNearbyStations); connect(viewRoute,&QPushButton::clicked,this,[this]{if(nearestStationId_>0)requestStationDetail(nearestStationId_,true);});
     return page;
 }
 
@@ -487,33 +615,187 @@ QWidget* MobileApp::buildStationPage()
 {
     auto* page = new QWidget; page->setObjectName(QStringLiteral("Page")); auto* outer = new QVBoxLayout(page); outer->setContentsMargins(0,0,0,0);
     auto* scroll = new QScrollArea; scroll->setWidgetResizable(true); auto* body = new QWidget; auto* layout = new QVBoxLayout(body); layout->setContentsMargins(18,18,18,12); layout->setSpacing(12);
-    auto* back = button(QStringLiteral("返回"), "Quiet"); back->setFixedWidth(72); layout->addWidget(back,0,Qt::AlignLeft);
+    auto* top = new QHBoxLayout; auto* back = button(QStringLiteral("返回"), "Quiet"); back->setFixedWidth(72); top->addWidget(back); top->addStretch(); top->addWidget(label(QStringLiteral("站点详情"),"SectionTitle")); top->addStretch(); auto* favorite=button(QStringLiteral("收藏"),"Quiet"); favorite->setFixedWidth(72); top->addWidget(favorite); layout->addLayout(top);
     auto* stationPlate = new QFrame; stationPlate->setObjectName(QStringLiteral("SoftSurface")); auto* plateLayout = new QVBoxLayout(stationPlate); plateLayout->setContentsMargins(18,18,18,18); plateLayout->setSpacing(7);
     auto* heading = new QHBoxLayout; detailName_ = label(QStringLiteral("充电站"), "PageTitle"); detailName_->setStyleSheet(QStringLiteral("font-size:24px")); heading->addWidget(detailName_, 1); detailMeta_ = label(QStringLiteral("读取中"), "StatusInfo"); detailMeta_->setAlignment(Qt::AlignCenter); detailMeta_->setFixedWidth(96); heading->addWidget(detailMeta_); plateLayout->addLayout(heading);
     detailAddress_ = label(QString(), "Muted"); plateLayout->addWidget(detailAddress_); plateLayout->addSpacing(12);
     auto* metricLayout = new QHBoxLayout; auto* priceBox = new QVBoxLayout; priceBox->addWidget(label(QStringLiteral("电价"), "Muted")); detailPrice_ = label(QStringLiteral("¥ —"), "Amount"); priceBox->addWidget(detailPrice_); metricLayout->addLayout(priceBox); metricLayout->addStretch();
-    auto* availableBox = new QVBoxLayout; availableBox->addWidget(label(QStringLiteral("当前空闲"), "Muted")); detailAvailability_ = label(QStringLiteral("—"), "Metric"); detailAvailability_->setStyleSheet(QStringLiteral("color:#149B68")); availableBox->addWidget(detailAvailability_); metricLayout->addLayout(availableBox); plateLayout->addLayout(metricLayout); layout->addWidget(stationPlate);
+    auto* availableBox = new QVBoxLayout; availableBox->addWidget(label(QStringLiteral("当前空闲"), "Muted")); detailAvailability_ = label(QStringLiteral("—"), "Metric"); detailAvailability_->setStyleSheet(QStringLiteral("color:#149B68")); availableBox->addWidget(detailAvailability_); metricLayout->addLayout(availableBox); plateLayout->addLayout(metricLayout);
+    auto* divider = new QFrame; divider->setObjectName(QStringLiteral("Divider")); plateLayout->addWidget(divider); auto* stationStats = new QHBoxLayout; stationStats->setSpacing(4);
+    auto addStat=[&](const QString& title,QLabel*& value){auto* box=new QVBoxLayout;box->setSpacing(2);value=label(QStringLiteral("—"),"SectionTitle");value->setAlignment(Qt::AlignCenter);auto* caption=label(title,"Muted");caption->setAlignment(Qt::AlignCenter);box->addWidget(value);box->addWidget(caption);stationStats->addLayout(box,1);};addStat(QStringLiteral("总桩"),detailTotal_);addStat(QStringLiteral("快充"),detailFast_);addStat(QStringLiteral("慢充"),detailSlow_);plateLayout->addLayout(stationStats);layout->addWidget(stationPlate);
     detailNotice_ = label(QString(), "Muted"); layout->addWidget(detailNotice_); layout->addSpacing(8); layout->addWidget(label(QStringLiteral("充电桩"), "SectionTitle")); chargerListBody_ = new QWidget; chargerListLayout_ = new QVBoxLayout(chargerListBody_); chargerListLayout_->setContentsMargins(0,0,0,0); chargerListLayout_->setSpacing(10); layout->addWidget(chargerListBody_); layout->addStretch(); scroll->setWidget(body); outer->addWidget(scroll,1);
-    auto* route = button(QStringLiteral("导航到充电站"), "Primary"); outer->addWidget(bottomActionBar({route}));
+    auto* route = button(QStringLiteral("导航到站"), "Secondary"); auto* reserve = button(QStringLiteral("预约充电"), "Primary"); outer->addWidget(bottomActionBar({route,reserve}));
     connect(back,&QPushButton::clicked,this,[this]{showPage(HomePage);});
     connect(route,&QPushButton::clicked,this,[this]{ currentCharger_ = ChargerInfo{}; showNavigation(); });
+    connect(reserve,&QPushButton::clicked,this,[this]{if(preferredCharger_.valid())showChargerDetail(preferredCharger_);});
     return page;
 }
 
 QWidget* MobileApp::buildChargerPage()
 {
-    auto* page = new QWidget; page->setObjectName(QStringLiteral("Page")); auto* outer = new QVBoxLayout(page); outer->setContentsMargins(0,0,0,0); outer->setSpacing(0);
-    auto* body = new QWidget; auto* layout = new QVBoxLayout(body); layout->setContentsMargins(18,18,18,0); layout->setSpacing(14); outer->addWidget(body,1);
-    auto* back = button(QStringLiteral("返回"), "Quiet"); back->setFixedWidth(72); layout->addWidget(back,0,Qt::AlignLeft);
-    auto* powerPlate = new QFrame; powerPlate->setObjectName(QStringLiteral("SoftSurface")); auto* powerLayout = new QVBoxLayout(powerPlate); powerLayout->setContentsMargins(22,22,22,22);
-    auto* identity = new QHBoxLayout; chargerCode_ = label(QStringLiteral("充电桩"), "PageTitle"); identity->addWidget(chargerCode_,1); chargerStatus_ = label(QStringLiteral("读取中"), "StatusInfo"); chargerStatus_->setAlignment(Qt::AlignCenter); chargerStatus_->setFixedWidth(92); identity->addWidget(chargerStatus_); powerLayout->addLayout(identity);
-    powerLayout->addSpacing(14);
-    powerLayout->addWidget(label(QStringLiteral("额定功率"), "Muted")); chargerPower_ = label(QStringLiteral("— kW"), "Metric"); chargerPower_->setStyleSheet(QStringLiteral("font-size:48px")); powerLayout->addWidget(chargerPower_); chargerMeta_ = label(QString(), "Muted"); powerLayout->addWidget(chargerMeta_); layout->addWidget(powerPlate);
+    auto* page = new QWidget;
+    page->setObjectName(QStringLiteral("Page"));
+    auto* outer = new QVBoxLayout(page);
+    outer->setContentsMargins(0,0,0,0);
+    outer->setSpacing(0);
 
-    auto* guide = new QFrame; guide->setObjectName(QStringLiteral("Surface")); auto* guideLayout = new QVBoxLayout(guide); guideLayout->setContentsMargins(18,16,18,16); guideLayout->setSpacing(7);
-    guideLayout->addWidget(label(QStringLiteral("到站后"), "SectionTitle")); guideLayout->addWidget(label(QStringLiteral("确认桩编号 → 插枪 → 开始充电"), "Muted")); layout->addWidget(guide);
-    chargerNotice_ = label(QString(), "Muted"); layout->addWidget(chargerNotice_); layout->addStretch();
-    auto* navigate = button(QStringLiteral("导航到充电桩"), "Secondary"); reserveButton_ = button(QStringLiteral("预约充电桩"), "Primary"); outer->addWidget(bottomActionBar({navigate,reserveButton_}));
+    auto* scroll = new QScrollArea;
+    scroll->setWidgetResizable(true);
+    auto* body = new QWidget;
+    auto* layout = new QVBoxLayout(body);
+    layout->setContentsMargins(16,14,16,12);
+    layout->setSpacing(10);
+    scroll->setWidget(body);
+    outer->addWidget(scroll,1);
+
+    auto* top = new QHBoxLayout;
+    auto* back = button(QStringLiteral("返回"), "Quiet");
+    back->setFixedWidth(72);
+    top->addWidget(back);
+    top->addStretch();
+    top->addWidget(label(QStringLiteral("充电桩详情"),"PageTitle"));
+    top->addStretch();
+    auto* help = button(QStringLiteral("客服"),"Quiet");
+    help->setFixedWidth(72);
+    top->addWidget(help);
+    layout->addLayout(top);
+
+    auto* stationRow = new QHBoxLayout;
+    chargerStationLabel_ = label(QStringLiteral("所属充电站"),"SectionTitle");
+    stationRow->addWidget(chargerStationLabel_,1);
+    chargerMeta_ = label(QStringLiteral("读取中"),"StatusOk");
+    chargerMeta_->setAlignment(Qt::AlignCenter);
+    stationRow->addWidget(chargerMeta_);
+    layout->addLayout(stationRow);
+
+    auto* hero = new QFrame;
+    hero->setObjectName(QStringLiteral("ChargerHero"));
+    hero->setStyleSheet(QStringLiteral("QFrame#ChargerHero{background:#FFFFFF;border:1px solid #DDE7FA;border-radius:16px}"));
+    auto* heroLayout = new QVBoxLayout(hero);
+    heroLayout->setContentsMargins(18,16,18,14);
+    heroLayout->setSpacing(10);
+
+    auto* deviceRow = new QHBoxLayout;
+    auto* identity = new QVBoxLayout;
+    chargerCode_ = label(QStringLiteral("充电桩"),"PageTitle");
+    identity->addWidget(chargerCode_);
+    auto* stateRow = new QHBoxLayout;
+    chargerStatus_ = label(QStringLiteral("读取中"),"StatusInfo");
+    chargerStatus_->setAlignment(Qt::AlignCenter);
+    chargerStatus_->setFixedWidth(78);
+    stateRow->addWidget(chargerStatus_);
+    chargerHint_ = label(QStringLiteral("状态同步中"),"StatusInfo");
+    chargerHint_->setAlignment(Qt::AlignCenter);
+    stateRow->addWidget(chargerHint_);
+    stateRow->addStretch();
+    identity->addLayout(stateRow);
+    identity->addStretch();
+    deviceRow->addLayout(identity,1);
+    auto* product = new QLabel;
+    product->setPixmap(QPixmap(QStringLiteral(":/resources/charger-product-v2.png"))
+        .scaled(112,138,Qt::KeepAspectRatio,Qt::SmoothTransformation));
+    product->setFixedSize(118,142);
+    product->setAlignment(Qt::AlignCenter);
+    deviceRow->addWidget(product);
+    heroLayout->addLayout(deviceRow);
+
+    auto* specs = new QHBoxLayout;
+    specs->setSpacing(12);
+    auto addSpec = [&](const QString& caption, QLabel*& value) {
+        auto* box = new QVBoxLayout;
+        box->setSpacing(3);
+        box->addWidget(label(caption,"Muted"));
+        value = label(QStringLiteral("—"),"SectionTitle");
+        box->addWidget(value);
+        specs->addLayout(box,1);
+    };
+    addSpec(QStringLiteral("额定功率"),chargerPower_);
+    addSpec(QStringLiteral("枪型"),chargerMethod_);
+    addSpec(QStringLiteral("当前状态"),chargerStateSpec_);
+    heroLayout->addLayout(specs);
+
+    auto* heroDivider = new QFrame;
+    heroDivider->setObjectName(QStringLiteral("Divider"));
+    heroLayout->addWidget(heroDivider);
+    auto* priceRow = new QHBoxLayout;
+    priceRow->addWidget(label(QStringLiteral("充电价格"),"SectionTitle"));
+    priceRow->addStretch();
+    chargerPrice_ = label(QStringLiteral("¥ — /度"),"Amount");
+    priceRow->addWidget(chargerPrice_);
+    heroLayout->addLayout(priceRow);
+    heroLayout->addWidget(label(QStringLiteral("最终费用以服务端结算结果为准"),"Muted"));
+    layout->addWidget(hero);
+
+    auto* details = surface();
+    auto* detailsLayout = new QVBoxLayout(details);
+    detailsLayout->setContentsMargins(18,8,18,8);
+    detailsLayout->setSpacing(0);
+    auto addDetail = [&](const QString& name, QLabel*& value, bool divider) {
+        auto* row = new QHBoxLayout;
+        row->setContentsMargins(0,9,0,9);
+        row->addWidget(label(name,"SectionTitle"));
+        row->addStretch();
+        value = label(QString(),"Muted");
+        value->setAlignment(Qt::AlignRight);
+        value->setMaximumWidth(220);
+        row->addWidget(value);
+        detailsLayout->addLayout(row);
+        if (divider) { auto* line=new QFrame; line->setObjectName(QStringLiteral("Divider")); detailsLayout->addWidget(line); }
+    };
+    QLabel* billing = nullptr;
+    QLabel* openHours = nullptr;
+    QLabel* support = nullptr;
+    addDetail(QStringLiteral("计费说明"),billing,true);
+    billing->setText(QStringLiteral("服务端实时计费"));
+    addDetail(QStringLiteral("开放时间"),openHours,true);
+    openHours->setText(QStringLiteral("以站点营业状态为准"));
+    addDetail(QStringLiteral("桩位位置"),chargerLocation_,true);
+    addDetail(QStringLiteral("支持方式"),support,false);
+    support->setText(QStringLiteral("预约充电"));
+    layout->addWidget(details);
+
+    auto* guide = surface();
+    auto* guideLayout = new QVBoxLayout(guide);
+    guideLayout->setContentsMargins(18,13,18,13);
+    guideLayout->setSpacing(9);
+    guideLayout->addWidget(label(QStringLiteral("到站后，3 步开始充电"),"SectionTitle"));
+    auto* steps = new QHBoxLayout;
+    const QStringList stepTitles{QStringLiteral("确认桩编号"),QStringLiteral("插枪"),QStringLiteral("开始充电")};
+    for (int i=0;i<stepTitles.size();++i) {
+        auto* box = new QVBoxLayout;
+        auto* number = label(QString::number(i+1));
+        number->setAlignment(Qt::AlignCenter);
+        number->setFixedSize(28,28);
+        number->setStyleSheet(QStringLiteral("background:#176CFF;color:white;border-radius:14px;font-weight:700"));
+        box->addWidget(number,0,Qt::AlignHCenter);
+        auto* title = label(stepTitles[i],"Muted");
+        title->setAlignment(Qt::AlignCenter);
+        box->addWidget(title);
+        steps->addLayout(box,1);
+    }
+    guideLayout->addLayout(steps);
+    layout->addWidget(guide);
+
+    auto* tips = surface();
+    auto* tipsLayout = new QVBoxLayout(tips);
+    tipsLayout->setContentsMargins(18,12,18,12);
+    tipsLayout->setSpacing(4);
+    tipsLayout->addWidget(label(QStringLiteral("温馨提示"),"SectionTitle"));
+    tipsLayout->addWidget(label(QStringLiteral("确认车辆连接可靠后再启动充电\n充电结束后请及时将充电枪归位"),"Muted"));
+    layout->addWidget(tips);
+    chargerNotice_ = label(QString(),"Muted");
+    layout->addWidget(chargerNotice_);
+    layout->addStretch();
+
+    auto* actionBar = new QWidget;
+    auto* actionLayout = new QHBoxLayout(actionBar);
+    actionLayout->setContentsMargins(16,8,16,16);
+    actionLayout->setSpacing(10);
+    auto* navigate = button(QStringLiteral("导航到此充电桩"),"Secondary");
+    reserveButton_ = button(QStringLiteral("预约充电桩"),"Primary");
+    actionLayout->addWidget(navigate,1);
+    actionLayout->addWidget(reserveButton_,1);
+    outer->addWidget(actionBar);
     connect(back,&QPushButton::clicked,this,[this]{showPage(StationPage);});
     connect(navigate,&QPushButton::clicked,this,&MobileApp::showNavigation);
     connect(reserveButton_,&QPushButton::clicked,this,[this]{reserveCharger(currentCharger_);});
@@ -547,13 +829,86 @@ QWidget* MobileApp::buildNavigationPage()
 
 QWidget* MobileApp::buildChargingPage()
 {
-    auto* page = new QWidget; page->setObjectName(QStringLiteral("Page")); auto* layout = new QVBoxLayout(page); layout->setContentsMargins(22,24,22,28); layout->setSpacing(12);
-    auto* top = new QHBoxLayout; top->addWidget(label(QStringLiteral("充电"), "PageTitle")); top->addStretch(); auto* refresh = button(QStringLiteral("同步"), "Quiet"); refresh->setFixedWidth(58); top->addWidget(refresh); layout->addLayout(top);
-    chargingStatus_ = label(QStringLiteral("正在同步"), "StatusInfo"); chargingStatus_->setAlignment(Qt::AlignCenter); chargingStatus_->setFixedWidth(112); layout->addWidget(chargingStatus_,0,Qt::AlignHCenter);
-    gauge_ = new ChargeGauge; layout->addWidget(gauge_,0,Qt::AlignHCenter); chargingStation_ = label(QStringLiteral("暂无订单"), "SectionTitle"); chargingStation_->setAlignment(Qt::AlignCenter); layout->addWidget(chargingStation_); chargingMetrics_ = label(QStringLiteral("请选择空闲充电桩"), "Muted"); chargingMetrics_->setAlignment(Qt::AlignCenter); layout->addWidget(chargingMetrics_);
-    auto* amountSurface = surface(); auto* amountLayout = new QHBoxLayout(amountSurface); amountLayout->setContentsMargins(18,15,18,15); amountLayout->addWidget(label(QStringLiteral("费用"), "Muted")); amountLayout->addStretch(); chargingAmount_ = label(QStringLiteral("¥ —"), "Amount"); amountLayout->addWidget(chargingAmount_); layout->addWidget(amountSurface);
-    chargingNotice_ = label(QString(), "Muted"); layout->addWidget(chargingNotice_); layout->addStretch(); chargingAction_ = button(QStringLiteral("查看附近站点"), "Primary"); layout->addWidget(chargingAction_);
-    connect(refresh,&QPushButton::clicked,this,[this]{requestActiveOrder(ChargingPage);}); connect(chargingAction_,&QPushButton::clicked,this,[this]{ const auto s=activeOrder_.statusEnum(); if(!activeOrder_.valid()){showPage(HomePage);} else if(s==OrderInfo::StatusReserved){performOrderAction(QString::fromLatin1(protocol::action::kOrderStart),chargingAction_);} else if(s==OrderInfo::StatusCharging){performOrderAction(QString::fromLatin1(protocol::action::kOrderStop),chargingAction_);} else if(s==OrderInfo::StatusWaitSettlement){performOrderAction(QString::fromLatin1(protocol::action::kOrderSettle),chargingAction_);} });
+    auto* page = new QWidget;
+    page->setObjectName(QStringLiteral("Page"));
+    auto* outer = new QVBoxLayout(page);
+    outer->setContentsMargins(0,0,0,0);
+    outer->setSpacing(0);
+    auto* scroll = new QScrollArea;
+    scroll->setWidgetResizable(true);
+    auto* body = new QWidget;
+    auto* layout = new QVBoxLayout(body);
+    layout->setContentsMargins(16,14,16,10);
+    layout->setSpacing(10);
+    scroll->setWidget(body);
+    outer->addWidget(scroll,1);
+
+    auto* top = new QHBoxLayout;
+    top->addWidget(label(QStringLiteral("充电中"),"PageTitle"));
+    chargingStatus_ = label(QStringLiteral("正在同步"),"StatusOk");
+    chargingStatus_->setAlignment(Qt::AlignCenter);
+    chargingStatus_->setFixedSize(76,30);
+    top->addWidget(chargingStatus_);
+    top->addStretch();
+    auto* refresh = button(QStringLiteral("同步"),"Secondary");
+    refresh->setFixedSize(68,34);
+    refresh->setStyleSheet(QStringLiteral("background:#EAF1FF;color:#1558C7;border-radius:12px;min-height:34px;max-height:34px;padding:0 12px;font-weight:650"));
+    top->addWidget(refresh);
+    layout->addLayout(top);
+
+    auto* summary = new QFrame;
+    summary->setObjectName(QStringLiteral("ChargingSummary"));
+    summary->setStyleSheet(QStringLiteral("QFrame#ChargingSummary{background:#FFFFFF;border:1px solid #E1E9F2;border-radius:16px}"));
+    auto* summaryLayout = new QVBoxLayout(summary);
+    summaryLayout->setContentsMargins(16,14,16,14);
+    summaryLayout->setSpacing(9);
+    auto* stationRow = new QHBoxLayout;
+    auto* stationIcon = new MetricGlyphWidget(MetricGlyphWidget::Battery,QColor(Theme::Blue),QColor(Theme::BlueSoft));
+    stationRow->addWidget(stationIcon);
+    auto* stationText = new QVBoxLayout;
+    chargingStation_ = label(QStringLiteral("暂无订单"),"SectionTitle");
+    stationText->addWidget(chargingStation_);
+    chargingMetrics_ = label(QStringLiteral("请选择空闲充电桩"),"Muted");
+    stationText->addWidget(chargingMetrics_);
+    stationRow->addLayout(stationText,1);
+    chargingStateText_ = label(QStringLiteral("等待"),"StatusInfo");
+    chargingStateText_->setAlignment(Qt::AlignCenter);
+    chargingStateText_->setFixedSize(68,46);
+    stationRow->addWidget(chargingStateText_);
+    summaryLayout->addLayout(stationRow);
+    auto* summaryDivider = new QFrame; summaryDivider->setObjectName(QStringLiteral("Divider")); summaryLayout->addWidget(summaryDivider);
+    auto* meta = new QHBoxLayout;
+    chargingStart_ = label(QStringLiteral("开始 —"),"Muted");
+    chargingMode_ = label(QStringLiteral("模式 —"),"Muted");
+    auto* stateCopy = label(QStringLiteral("服务端同步"),"Muted");
+    meta->addWidget(chargingStart_);meta->addStretch();meta->addWidget(chargingMode_);meta->addStretch();meta->addWidget(stateCopy);summaryLayout->addLayout(meta);
+    layout->addWidget(summary);
+
+    auto* liveArea = new QHBoxLayout;
+    liveArea->setSpacing(4);
+    auto* powerSide = new QVBoxLayout;powerSide->setSpacing(2);powerSide->addStretch();chargingPowerLive_=label(QStringLiteral("— kW"),"Amount");chargingPowerLive_->setWordWrap(false);chargingPowerLive_->setStyleSheet(QStringLiteral("font-size:20px;font-weight:700"));chargingPowerLive_->setAlignment(Qt::AlignCenter);powerSide->addWidget(chargingPowerLive_);auto* powerCaption=label(QStringLiteral("当前功率"),"Muted");powerCaption->setAlignment(Qt::AlignCenter);powerSide->addWidget(powerCaption);powerWave_=new SparklineWidget(QColor(Theme::Blue));powerSide->addWidget(powerWave_);powerSide->addStretch();liveArea->addLayout(powerSide,1);
+    gauge_ = new ChargeGauge; gauge_->setFixedSize(210,210); liveArea->addWidget(gauge_);
+    auto* energySide = new QVBoxLayout;energySide->setSpacing(2);energySide->addStretch();chargingEnergyLive_=label(QStringLiteral("— kWh"),"Amount");chargingEnergyLive_->setWordWrap(false);chargingEnergyLive_->setStyleSheet(QStringLiteral("font-size:20px;font-weight:700"));chargingEnergyLive_->setAlignment(Qt::AlignCenter);energySide->addWidget(chargingEnergyLive_);auto* energyCaption=label(QStringLiteral("已充电量"),"Muted");energyCaption->setAlignment(Qt::AlignCenter);energySide->addWidget(energyCaption);energyWave_=new SparklineWidget(QColor(Theme::Green));energySide->addWidget(energyWave_);energySide->addStretch();liveArea->addLayout(energySide,1);layout->addLayout(liveArea);
+
+    auto* strip = surface();auto* stripLayout=new QHBoxLayout(strip);stripLayout->setContentsMargins(12,10,12,10);stripLayout->setSpacing(6);
+    auto addStrip=[&](const QString& caption,QLabel*& value){auto* box=new QVBoxLayout;box->setSpacing(1);value=label(QStringLiteral("—"),"SectionTitle");value->setAlignment(Qt::AlignCenter);auto* cap=label(caption,"Muted");cap->setAlignment(Qt::AlignCenter);box->addWidget(value);box->addWidget(cap);stripLayout->addLayout(box,1);};addStrip(QStringLiteral("已用时"),chargingDuration_);addStrip(QStringLiteral("预计剩余"),chargingRemaining_);addStrip(QStringLiteral("预计费用"),chargingFeeSummary_);layout->addWidget(strip);
+
+    auto* grid = new QGridLayout;grid->setHorizontalSpacing(8);grid->setVerticalSpacing(8);
+    auto addTile=[&](int row,int col,MetricGlyphWidget::Kind kind,const QColor& color,const QColor& bg,const QString& title,QLabel*& value,QLabel* detail){auto* tile=surface();auto* tileLayout=new QHBoxLayout(tile);tileLayout->setContentsMargins(10,8,10,8);tileLayout->setSpacing(8);tileLayout->addWidget(new MetricGlyphWidget(kind,color,bg));auto* text=new QVBoxLayout;text->setSpacing(0);text->addWidget(label(title,"Muted"));value=label(QStringLiteral("—"),"SectionTitle");value->setWordWrap(false);value->setStyleSheet(QStringLiteral("font-size:17px;font-weight:700"));text->addWidget(value);if(detail){detail->setWordWrap(true);detail->setStyleSheet(QStringLiteral("color:#647487;font-size:11px"));text->addWidget(detail);}tileLayout->addLayout(text,1);grid->addWidget(tile,row,col);};
+    addTile(0,0,MetricGlyphWidget::Battery,QColor(Theme::Blue),QColor(Theme::BlueSoft),QStringLiteral("已充电量"),chargingEnergyTile_,nullptr);
+    chargingElectrical_=label(QStringLiteral("电压、电流待服务端返回"),"Muted");
+    addTile(0,1,MetricGlyphWidget::Bolt,QColor(Theme::Green),QColor(Theme::GreenSoft),QStringLiteral("当前功率"),chargingPowerTile_,chargingElectrical_);
+    addTile(1,0,MetricGlyphWidget::Clock,QColor(Theme::Blue),QColor(Theme::BlueSoft),QStringLiteral("已用时"),chargingDurationTile_,nullptr);
+    addTile(1,1,MetricGlyphWidget::Coin,QColor("#F39A16"),QColor("#FFF1DC"),QStringLiteral("累计费用"),chargingFeeTile_,nullptr);
+    layout->addLayout(grid);
+
+    chargingAmount_=chargingFeeTile_;
+    chargingNotice_=label(QString(),"Muted");layout->addWidget(chargingNotice_);layout->addStretch();
+
+    auto* actions=new QWidget;auto* actionsLayout=new QHBoxLayout(actions);actionsLayout->setContentsMargins(16,8,16,10);actionsLayout->setSpacing(10);chargingAction_=button(QStringLiteral("停止充电"),"Danger");chargingOrderButton_=button(QStringLiteral("查看订单"),"Primary");actionsLayout->addWidget(chargingAction_,1);actionsLayout->addWidget(chargingOrderButton_,1);outer->addWidget(actions);
+    connect(refresh,&QPushButton::clicked,this,[this]{requestActiveOrder(ChargingPage);});
+    connect(chargingOrderButton_,&QPushButton::clicked,this,[this]{requestActiveOrder(OrdersPage);});
+    connect(chargingAction_,&QPushButton::clicked,this,[this]{const auto s=activeOrder_.statusEnum();if(!activeOrder_.valid()){showPage(HomePage);}else if(s==OrderInfo::StatusReserved){performOrderAction(QString::fromLatin1(protocol::action::kOrderStart),chargingAction_);}else if(s==OrderInfo::StatusCharging){performOrderAction(QString::fromLatin1(protocol::action::kOrderStop),chargingAction_);}else if(s==OrderInfo::StatusWaitSettlement){performOrderAction(QString::fromLatin1(protocol::action::kOrderSettle),chargingAction_);}});
     return page;
 }
 
@@ -616,17 +971,23 @@ void MobileApp::requestNearbyStations()
 
 void MobileApp::renderStationList(const QList<StationInfo>& stations)
 {
-    clearLayout(stationListLayout_);mapWidget_->setStations(stations);if(stations.isEmpty()){stationListLayout_->addWidget(label(QStringLiteral("没有找到站点。可以更换位置后重试。"),"Muted"));return;}for(const auto&s:stations){auto* row=surface();auto* l=new QHBoxLayout(row);l->setContentsMargins(16,14,12,14);l->setSpacing(10);auto* node=new QFrame;node->setFixedSize(12,12);node->setStyleSheet(QStringLiteral("background:%1;border:3px solid white;border-radius:6px").arg(s.availableChargers>0?Theme::Green:Theme::Amber));l->addWidget(node,0,Qt::AlignTop);auto* text=new QVBoxLayout;text->setSpacing(3);text->addWidget(label(s.name,"SectionTitle"));text->addWidget(label(QStringLiteral("%1 公里 · ¥%2/度 · %3/%4 空闲").arg(s.distanceKm,0,'f',1).arg(s.pricePerKwh,0,'f',2).arg(s.availableChargers).arg(s.totalChargers),"Muted"));l->addLayout(text,1);auto* open=button(QStringLiteral("查看"),"Secondary");open->setFixedSize(66,42);l->addWidget(open);connect(open,&QPushButton::clicked,this,[this,id=s.stationId]{requestStationDetail(id);});stationListLayout_->addWidget(row);}stationListLayout_->addStretch();
+    nearbyStations_=stations;mapWidget_->setStations(stations);nearestStationId_=stations.isEmpty()?0:stations.first().stationId;if(stations.isEmpty())homeRouteSummary_->setText(QStringLiteral("附近暂无站点"));else homeRouteSummary_->setText(QStringLiteral("最近 %1 km · %2").arg(stations.first().distanceKm,0,'f',1).arg(stations.first().name));applyHomeFilter();
 }
 
-void MobileApp::requestStationDetail(qint64 stationId)
+void MobileApp::applyHomeFilter()
 {
-    showPage(StationPage);setNotice(detailNotice_,QStringLiteral("正在同步充电桩…"));clearLayout(chargerListLayout_);QJsonObject data;data.insert(QStringLiteral("stationId"),double(stationId));network_->sendRequest(QString::fromLatin1(protocol::action::kStationDetail),data,[this](const protocol::Response&r){if(!r.isOk()){setNotice(detailNotice_,protocol::describeError(r.code,r.message),true);return;}StationDetail d;d.station=StationInfo::fromJson(r.data);d.address=r.data.value(QStringLiteral("address")).toString();d.latitude=r.data.value(QStringLiteral("latitude")).toDouble();d.longitude=r.data.value(QStringLiteral("longitude")).toDouble();for(const auto&v:r.data.value(QStringLiteral("chargers")).toArray()){const auto c=ChargerInfo::fromJson(v.toObject());if(c.valid())d.chargers.append(c);}renderStationDetail(d);});
+    QList<StationInfo> stations=nearbyStations_;if(homeFilter_==1){std::sort(stations.begin(),stations.end(),[](const StationInfo&a,const StationInfo&b){return a.pricePerKwh<b.pricePerKwh;});}else if(homeFilter_==2){stations.erase(std::remove_if(stations.begin(),stations.end(),[](const StationInfo&s){return s.availableChargers<=0;}),stations.end());}else{std::sort(stations.begin(),stations.end(),[](const StationInfo&a,const StationInfo&b){return a.distanceKm<b.distanceKm;});}
+    clearLayout(stationListLayout_);if(stations.isEmpty()){stationListLayout_->addWidget(label(QStringLiteral("没有符合条件的站点"),"Muted"));return;}int rank=1;for(const auto&s:stations){auto* card=surface();auto* cardLayout=new QVBoxLayout(card);cardLayout->setContentsMargins(14,12,12,12);cardLayout->setSpacing(7);auto* header=new QHBoxLayout;auto* badge=label(QString::number(rank++));badge->setAlignment(Qt::AlignCenter);badge->setFixedSize(30,30);badge->setStyleSheet(QStringLiteral("background:#EAF1FF;color:#176CFF;border-radius:15px;font-weight:700"));header->addWidget(badge);header->addWidget(label(s.name,"SectionTitle"),1);auto* status=label(s.availableChargers>0?QStringLiteral("可充电"):QStringLiteral("暂无空闲"),s.availableChargers>0?"StatusOk":"StatusWarn");status->setAlignment(Qt::AlignCenter);header->addWidget(status);cardLayout->addLayout(header);cardLayout->addWidget(label(QStringLiteral("%1 km · ¥%2/度 · %3/%4 空闲").arg(s.distanceKm,0,'f',1).arg(s.pricePerKwh,0,'f',2).arg(s.availableChargers).arg(s.totalChargers),"Muted"));auto* actions=new QHBoxLayout;actions->addStretch();auto* nav=button(QStringLiteral("导航"),"Primary");nav->setFixedSize(72,42);auto* detail=button(QStringLiteral("详情"),"Secondary");detail->setFixedSize(72,42);actions->addWidget(nav);actions->addWidget(detail);cardLayout->addLayout(actions);connect(detail,&QPushButton::clicked,this,[this,id=s.stationId]{requestStationDetail(id);});connect(nav,&QPushButton::clicked,this,[this,id=s.stationId]{requestStationDetail(id,true);});stationListLayout_->addWidget(card);}stationListLayout_->addStretch();
+}
+
+void MobileApp::requestStationDetail(qint64 stationId, bool navigateAfter)
+{
+    navigateAfterDetail_=navigateAfter;showPage(StationPage);setNotice(detailNotice_,QStringLiteral("正在同步充电桩…"));clearLayout(chargerListLayout_);QJsonObject data;data.insert(QStringLiteral("stationId"),double(stationId));network_->sendRequest(QString::fromLatin1(protocol::action::kStationDetail),data,[this](const protocol::Response&r){if(!r.isOk()){setNotice(detailNotice_,protocol::describeError(r.code,r.message),true);return;}StationDetail d;d.station=StationInfo::fromJson(r.data);d.address=r.data.value(QStringLiteral("address")).toString();d.latitude=r.data.value(QStringLiteral("latitude")).toDouble();d.longitude=r.data.value(QStringLiteral("longitude")).toDouble();for(const auto&v:r.data.value(QStringLiteral("chargers")).toArray()){const auto c=ChargerInfo::fromJson(v.toObject());if(c.valid())d.chargers.append(c);}renderStationDetail(d);if(navigateAfterDetail_){navigateAfterDetail_=false;currentCharger_=ChargerInfo{};showNavigation();}});
 }
 
 void MobileApp::renderStationDetail(const StationDetail& d)
 {
-    currentStation_=d;detailName_->setText(d.station.name);detailMeta_->setText(d.station.availableChargers>0?QStringLiteral("可充电"):QStringLiteral("暂无空闲"));detailMeta_->setObjectName(d.station.availableChargers>0?QStringLiteral("StatusOk"):QStringLiteral("StatusWarn"));detailMeta_->style()->unpolish(detailMeta_);detailMeta_->style()->polish(detailMeta_);detailAddress_->setText(d.address);detailPrice_->setText(QStringLiteral("¥ %1/度").arg(d.station.pricePerKwh,0,'f',2));detailAvailability_->setText(QStringLiteral("%1").arg(d.station.availableChargers));setNotice(detailNotice_,d.chargers.isEmpty()?QStringLiteral("暂无充电桩"):QString());clearLayout(chargerListLayout_);
+    currentStation_=d;preferredCharger_=ChargerInfo{};int fastCount=0;int slowCount=0;for(const auto&c:d.chargers){if(c.type==protocol::ChargerTypeFast)++fastCount;else ++slowCount;if(!preferredCharger_.valid()&&c.isIdle())preferredCharger_=c;}detailName_->setText(d.station.name);detailMeta_->setText(d.station.availableChargers>0?QStringLiteral("可充电"):QStringLiteral("暂无空闲"));detailMeta_->setObjectName(d.station.availableChargers>0?QStringLiteral("StatusOk"):QStringLiteral("StatusWarn"));detailMeta_->style()->unpolish(detailMeta_);detailMeta_->style()->polish(detailMeta_);detailAddress_->setText(d.address);detailPrice_->setText(QStringLiteral("¥ %1/度").arg(d.station.pricePerKwh,0,'f',2));detailAvailability_->setText(QStringLiteral("%1").arg(d.station.availableChargers));detailTotal_->setText(QString::number(d.chargers.size()));detailFast_->setText(QString::number(fastCount));detailSlow_->setText(QString::number(slowCount));setNotice(detailNotice_,d.chargers.isEmpty()?QStringLiteral("暂无充电桩"):QString());clearLayout(chargerListLayout_);
     for(const auto&c:d.chargers){auto* row=surface();auto*l=new QHBoxLayout(row);l->setContentsMargins(16,15,12,15);auto* text=new QVBoxLayout;text->setSpacing(4);text->addWidget(label(c.code.isEmpty()?QStringLiteral("充电桩 %1").arg(c.chargerId):c.code,"SectionTitle"));text->addWidget(label(QStringLiteral("%1 · %2 kW · %3").arg(c.typeLabel()).arg(c.powerKw,0,'f',0).arg(c.statusLabel()),"Muted"));l->addLayout(text,1);auto* choose=button(QStringLiteral("查看"),"Secondary");choose->setFixedSize(72,46);l->addWidget(choose);connect(choose,&QPushButton::clicked,this,[this,c]{showChargerDetail(c);});chargerListLayout_->addWidget(row);}chargerListLayout_->addStretch();
 }
 
@@ -642,9 +1003,18 @@ void MobileApp::showChargerDetail(const ChargerInfo& charger)
     chargerStatus_->setObjectName(statusStyle);
     chargerStatus_->style()->unpolish(chargerStatus_);
     chargerStatus_->style()->polish(chargerStatus_);
+    chargerHint_->setText(charger.isIdle()
+        ? QStringLiteral("可直接预约") : QStringLiteral("暂不可预约"));
+    chargerStationLabel_->setText(currentStation_.station.name);
+    chargerMeta_->setText(QStringLiteral("%1桩空闲")
+        .arg(currentStation_.station.availableChargers));
     chargerPower_->setText(QStringLiteral("%1 kW").arg(charger.powerKw,0,'f',0));
-    chargerMeta_->setText(QStringLiteral("%1 · %2\n%3")
-        .arg(charger.typeLabel(), currentStation_.station.name, currentStation_.address));
+    chargerMethod_->setText(charger.type == protocol::ChargerTypeFast
+        ? QStringLiteral("直流快充") : QStringLiteral("交流慢充"));
+    chargerStateSpec_->setText(charger.statusLabel());
+    chargerPrice_->setText(QStringLiteral("¥ %1 /度")
+        .arg(currentStation_.station.pricePerKwh,0,'f',2));
+    chargerLocation_->setText(currentStation_.address);
     reserveButton_->setEnabled(charger.isIdle());
     reserveButton_->setText(charger.isIdle()
         ? QStringLiteral("预约充电桩") : QStringLiteral("当前不可预约"));
@@ -713,10 +1083,39 @@ void MobileApp::requestActiveOrder(Page destination)
 
 void MobileApp::renderOrder(const OrderInfo& o)
 {
-    const auto state=o.statusEnum();chargingStatus_->setText(statusName(state));QString obj=state==OrderInfo::StatusCharging?QStringLiteral("StatusOk"):(state==OrderInfo::StatusReserved||state==OrderInfo::StatusWaitSettlement?QStringLiteral("StatusWarn"):QStringLiteral("StatusInfo"));chargingStatus_->setObjectName(obj);chargingStatus_->style()->unpolish(chargingStatus_);chargingStatus_->style()->polish(chargingStatus_);
-    if(!o.valid()){gauge_->setValue(0,QStringLiteral("—"),QStringLiteral("等待订单"));chargingStation_->setText(QStringLiteral("暂无订单"));chargingMetrics_->setText(QStringLiteral("请选择空闲充电桩"));chargingAmount_->setText(QStringLiteral("¥ —"));chargingAction_->setText(QStringLiteral("查找充电站"));chargingAction_->setObjectName(QStringLiteral("Primary"));chargingAction_->style()->unpolish(chargingAction_);chargingAction_->style()->polish(chargingAction_);return;}
-    const double pct=o.progressPercent>=0?o.progressPercent:(o.targetEnergyKwh>0?o.energyKwh/o.targetEnergyKwh*100.0:0.0);gauge_->setValue(pct,state==OrderInfo::StatusCharging?QStringLiteral("%1%").arg(qRound(pct)):statusName(state),state==OrderInfo::StatusCharging?QStringLiteral("实时充电进度"):QStringLiteral("服务端订单状态"));chargingStation_->setText(o.stationName);chargingMetrics_->setText(QStringLiteral("%1 · %2 kW\n%3 · 已充 %4 kWh").arg(o.chargerCode).arg(o.powerKw,0,'f',0).arg(durationText(o.durationMs())).arg(o.energyKwh,0,'f',2));chargingAmount_->setText(QStringLiteral("¥ %1").arg(state==OrderInfo::StatusWaitSettlement?o.amount:o.estimatedAmount,0,'f',2));
-    if(state==OrderInfo::StatusReserved)chargingAction_->setText(QStringLiteral("开始充电"));else if(state==OrderInfo::StatusCharging)chargingAction_->setText(QStringLiteral("结束充电"));else if(state==OrderInfo::StatusWaitSettlement)chargingAction_->setText(QStringLiteral("确认结算"));else chargingAction_->setText(QStringLiteral("查看附近站点"));chargingAction_->setObjectName(state==OrderInfo::StatusCharging?QStringLiteral("Danger"):QStringLiteral("Primary"));chargingAction_->style()->unpolish(chargingAction_);chargingAction_->style()->polish(chargingAction_);
+    const auto state=o.statusEnum();
+    const QString stateText=statusName(state);
+    const QString statusObject=state==OrderInfo::StatusCharging?QStringLiteral("StatusOk"):(state==OrderInfo::StatusReserved||state==OrderInfo::StatusWaitSettlement?QStringLiteral("StatusWarn"):QStringLiteral("StatusInfo"));
+    chargingStatus_->setText(state==OrderInfo::StatusCharging?QStringLiteral("充电正常"):stateText);
+    chargingStatus_->setObjectName(statusObject);chargingStatus_->style()->unpolish(chargingStatus_);chargingStatus_->style()->polish(chargingStatus_);
+    chargingStateText_->setText(stateText);chargingStateText_->setObjectName(statusObject);chargingStateText_->style()->unpolish(chargingStateText_);chargingStateText_->style()->polish(chargingStateText_);
+
+    if(!o.valid()){
+        gauge_->setValue(0,QStringLiteral("—"),QStringLiteral("等待订单"));
+        chargingStation_->setText(QStringLiteral("暂无订单"));chargingMetrics_->setText(QStringLiteral("请选择空闲充电桩"));
+        chargingStart_->setText(QStringLiteral("开始 —"));chargingMode_->setText(QStringLiteral("模式 —"));
+        chargingPowerLive_->setText(QStringLiteral("— kW"));chargingEnergyLive_->setText(QStringLiteral("— kWh"));
+        chargingDuration_->setText(QStringLiteral("—"));chargingRemaining_->setText(QStringLiteral("—"));chargingFeeSummary_->setText(QStringLiteral("¥ —"));
+        chargingEnergyTile_->setText(QStringLiteral("— kWh"));chargingPowerTile_->setText(QStringLiteral("— kW"));chargingDurationTile_->setText(QStringLiteral("—"));chargingFeeTile_->setText(QStringLiteral("¥ —"));chargingElectrical_->setText(QStringLiteral("电压、电流待服务端返回"));
+        powerWave_->setSamples({});energyWave_->setSamples({});
+        chargingAction_->setText(QStringLiteral("查找充电站"));chargingAction_->setObjectName(QStringLiteral("Primary"));chargingOrderButton_->setEnabled(false);chargingAction_->style()->unpolish(chargingAction_);chargingAction_->style()->polish(chargingAction_);return;
+    }
+
+    const double pct=o.progressPercent>=0?o.progressPercent:(o.targetEnergyKwh>0?o.energyKwh/o.targetEnergyKwh*100.0:0.0);
+    const qint64 duration=o.durationMs();
+    qint64 remaining=o.remainingSeconds;
+    if(remaining<=0&&o.targetEnergyKwh>o.energyKwh&&o.powerKw>0){remaining=qint64((o.targetEnergyKwh-o.energyKwh)/o.powerKw*3600.0);}
+    const double fee=state==OrderInfo::StatusWaitSettlement?o.amount:o.estimatedAmount;
+    gauge_->setValue(pct,state==OrderInfo::StatusCharging?QStringLiteral("%1%").arg(qRound(pct)):stateText,state==OrderInfo::StatusCharging?QStringLiteral("极速充电中"):QStringLiteral("服务端订单状态"));
+    chargingStation_->setText(o.stationName);chargingMetrics_->setText(QStringLiteral("设备编号 %1").arg(o.chargerCode));
+    chargingStart_->setText(QStringLiteral("开始 %1").arg(o.startTimeMs>0?QDateTime::fromMSecsSinceEpoch(o.startTimeMs).toString(QStringLiteral("HH:mm")):QStringLiteral("—")));
+    chargingMode_->setText(QStringLiteral("模式 %1").arg(o.chargerType==protocol::ChargerTypeFast?QStringLiteral("快充"):QStringLiteral("慢充")));
+    chargingPowerLive_->setText(QStringLiteral("%1 kW").arg(o.powerKw,0,'f',0));chargingEnergyLive_->setText(QStringLiteral("%1 kWh").arg(o.energyKwh,0,'f',2));
+    chargingDuration_->setText(clockDurationText(duration));chargingRemaining_->setText(remaining>0?clockDurationText(remaining*1000):QStringLiteral("—"));chargingFeeSummary_->setText(QStringLiteral("¥ %1").arg(fee,0,'f',2));
+    chargingEnergyTile_->setText(QStringLiteral("%1 kWh").arg(o.energyKwh,0,'f',2));chargingPowerTile_->setText(QStringLiteral("%1 kW").arg(o.powerKw,0,'f',0));chargingDurationTile_->setText(clockDurationText(duration));chargingFeeTile_->setText(QStringLiteral("¥ %1").arg(fee,0,'f',2));
+    chargingElectrical_->setText(o.voltageV>0&&o.currentA>0?QStringLiteral("电压 %1 V · 电流 %2 A").arg(o.voltageV,0,'f',0).arg(o.currentA,0,'f',0):QStringLiteral("电压、电流待服务端返回"));
+    powerWave_->setSamples(o.powerTrend);energyWave_->setSamples(o.energyTrend);chargingOrderButton_->setEnabled(true);
+    if(state==OrderInfo::StatusReserved)chargingAction_->setText(QStringLiteral("开始充电"));else if(state==OrderInfo::StatusCharging)chargingAction_->setText(QStringLiteral("停止充电"));else if(state==OrderInfo::StatusWaitSettlement)chargingAction_->setText(QStringLiteral("确认结算"));else chargingAction_->setText(QStringLiteral("查看附近站点"));chargingAction_->setObjectName(state==OrderInfo::StatusCharging?QStringLiteral("Danger"):QStringLiteral("Primary"));chargingAction_->style()->unpolish(chargingAction_);chargingAction_->style()->polish(chargingAction_);
 }
 
 void MobileApp::performOrderAction(const QString& action,QPushButton* source)

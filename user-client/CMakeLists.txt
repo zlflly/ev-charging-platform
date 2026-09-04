@@ -40,4 +40,6 @@ qt_add_resources(user-client "app_resources"
     PREFIX "/"
     FILES
         resources/home-map.html
+        resources/login-hero-v2.png
+        resources/charger-product-v2.png
 )
