@@ -41,6 +41,6 @@ int main(int argc, char* argv[])
         QCoreApplication::exit(1);
     });
 
-    client.connectToServer(QStringLiteral("127.0.0.1"), 9000);
+    client.connectToServer(QStringLiteral("127.0.0.1"), 8888);
     return application.exec();
 }

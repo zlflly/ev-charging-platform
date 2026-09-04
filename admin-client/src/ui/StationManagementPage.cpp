@@ -25,6 +25,7 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <limits>
 
 namespace {
 
@@ -109,6 +110,13 @@ bool promptNewStation(QWidget* parent, StationCreateRequest* request)
     longitudeEdit->setDecimals(6);
     longitudeEdit->setSingleStep(0.0001);
     longitudeEdit->setValue(116.407400);
+    auto* priceEdit = new QDoubleSpinBox(panel);
+    priceEdit->setRange(0.01, std::numeric_limits<double>::max());
+    priceEdit->setDecimals(2);
+    priceEdit->setSingleStep(0.10);
+    priceEdit->setValue(1.50);
+    priceEdit->setPrefix(QStringLiteral("¥ "));
+    priceEdit->setSuffix(QStringLiteral(" / 度"));
     auto* chargerCountEdit = new QSpinBox(panel);
     chargerCountEdit->setRange(0, 100);
     chargerCountEdit->setValue(4);
@@ -118,6 +126,7 @@ bool promptNewStation(QWidget* parent, StationCreateRequest* request)
     form->addRow(QStringLiteral("详细地址"), addressEdit);
     form->addRow(QStringLiteral("纬度"), latitudeEdit);
     form->addRow(QStringLiteral("经度"), longitudeEdit);
+    form->addRow(QStringLiteral("充电单价"), priceEdit);
     form->addRow(QStringLiteral("初始电桩"), chargerCountEdit);
     layout->addWidget(panel);
 
@@ -149,6 +158,7 @@ bool promptNewStation(QWidget* parent, StationCreateRequest* request)
         candidate.address = addressEdit->text();
         candidate.latitude = latitudeEdit->value();
         candidate.longitude = longitudeEdit->value();
+        candidate.pricePerKwh = priceEdit->value();
         candidate.chargerCount = chargerCountEdit->value();
         QString error;
         if (!candidate.validate(&error)) {
@@ -215,10 +225,18 @@ bool promptEditStation(QWidget* parent, const Station& station,
     longitude->setDecimals(6);
     longitude->setSingleStep(0.0001);
     longitude->setValue(station.longitude);
+    auto* price = new QDoubleSpinBox(panel);
+    price->setRange(0.01, std::numeric_limits<double>::max());
+    price->setDecimals(2);
+    price->setSingleStep(0.10);
+    price->setValue(station.pricePerKwh);
+    price->setPrefix(QStringLiteral("¥ "));
+    price->setSuffix(QStringLiteral(" / 度"));
     form->addRow(QStringLiteral("站点名称"), name);
     form->addRow(QStringLiteral("详细地址"), address);
     form->addRow(QStringLiteral("纬度"), latitude);
     form->addRow(QStringLiteral("经度"), longitude);
+    form->addRow(QStringLiteral("充电单价"), price);
     layout->addWidget(panel);
 
     auto* error = new QLabel(&dialog);
@@ -241,6 +259,7 @@ bool promptEditStation(QWidget* parent, const Station& station,
         candidate.address = address->text();
         candidate.latitude = latitude->value();
         candidate.longitude = longitude->value();
+        candidate.pricePerKwh = price->value();
         QString validationError;
         if (!candidate.validate(&validationError)) {
             error->setText(validationError);
@@ -488,14 +507,14 @@ StationManagementPage::StationManagementPage(AdminApiClient* api, QWidget* paren
         {QStringLiteral("站点 ID ↕"), QStringLiteral("站点名称 ↕"),
          QStringLiteral("详细地址 ↕"), QStringLiteral("纬度 ↕"),
          QStringLiteral("经度 ↕"), QStringLiteral("总桩数 ↕"),
-         QStringLiteral("在线率 ↕")}, this);
+         QStringLiteral("充电单价 ↕"), QStringLiteral("在线率 ↕")}, this);
     stationTable_->tableView()->horizontalHeader()->setSectionResizeMode(
         2, QHeaderView::Stretch);
     stationTable_->tableView()->horizontalHeader()->setSectionResizeMode(
         0, QHeaderView::ResizeToContents);
     stationTable_->tableView()->horizontalHeader()->setSectionResizeMode(
         1, QHeaderView::ResizeToContents);
-    for (int column = 3; column <= 6; ++column) {
+    for (int column = 3; column <= 7; ++column) {
         stationTable_->tableView()->horizontalHeader()->setSectionResizeMode(
             column, QHeaderView::ResizeToContents);
     }
@@ -637,14 +656,15 @@ void StationManagementPage::applyFilter()
             QString::number(station.latitude, 'f', 6),
             QString::number(station.longitude, 'f', 6),
             QStringLiteral("%1 台").arg(station.totalCount),
+            QStringLiteral("¥ %1 / 度").arg(station.pricePerKwh, 0, 'f', 2),
             QStringLiteral("%1%").arg(station.onlineRate, 0, 'f', 1),
         };
         row.sortValues = {
             station.stationId, station.name, station.address,
             station.latitude, station.longitude, station.totalCount,
-            station.onlineRate,
+            station.pricePerKwh, station.onlineRate,
         };
-        row.styles.append({6, onlineRateColor(station), {}, true});
+        row.styles.append({7, onlineRateColor(station), {}, true});
         rows.append(row);
     }
     stationTable_->setRows(rows);
@@ -774,8 +794,10 @@ void StationManagementPage::showDetail(const StationDetail& detail)
     }
     detailTable_->setRows(rows);
     detailMeta_->setText(
-        QStringLiteral("%1 台设备 · %2, %3")
+        QStringLiteral("%1 台设备 · 空闲 %2 台 · ¥ %3 / 度 · %4, %5")
             .arg(detail.chargers.size())
+            .arg(detail.availableCount)
+            .arg(detail.pricePerKwh, 0, 'f', 2)
             .arg(detail.latitude, 0, 'f', 6)
             .arg(detail.longitude, 0, 'f', 6));
     if (rows.isEmpty()) {

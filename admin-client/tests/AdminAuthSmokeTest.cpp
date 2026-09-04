@@ -54,6 +54,6 @@ int main(int argc, char* argv[])
         finish(false, "AUTH SMOKE TEST FAILED (timeout)");
     });
 
-    client.connectToServer(QStringLiteral("127.0.0.1"), 9000);
+    client.connectToServer(QStringLiteral("127.0.0.1"), 8888);
     return application.exec();
 }

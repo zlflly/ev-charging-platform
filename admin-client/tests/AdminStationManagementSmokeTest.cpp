@@ -90,6 +90,7 @@ int main(int argc, char* argv[])
                                         request.address = QStringLiteral("北京市通州区运河东大街");
                                         request.latitude = 39.902500;
                                         request.longitude = 116.656300;
+                                        request.pricePerKwh = 1.40;
                                         request.chargerCount = 2;
                                         const bool createStarted = api.createStation(
                                             request,
@@ -130,7 +131,10 @@ int main(int argc, char* argv[])
                                                                 [](std::optional<StationDetail> createdDetail,
                                                                    const QString&) {
                                                                     bool ok = createdDetail
-                                                                        && createdDetail->chargers.size() == 2;
+                                                                        && createdDetail->chargers.size() == 2
+                                                                        && createdDetail->totalCount == 2
+                                                                        && createdDetail->availableCount == 2
+                                                                        && createdDetail->pricePerKwh == 1.40;
                                                                     if (ok) {
                                                                         for (const StationCharger& charger
                                                                              : createdDetail->chargers) {

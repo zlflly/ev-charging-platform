@@ -1,10 +1,14 @@
 # 管理员客户端协议约定
 
-> 当前状态：客户端与 mock server 已按本约定实现；成员 A 的真实服务端应按此对接。
+> 对齐基线：成员 A `fengshu-server-db` 分支的《协议冻结说明》《对接说明》及
+> `StationService` 实际响应。公共接口以成员 A 为准；管理员未实现部分在本文标为
+> “待服务端冻结扩展”，不得反向修改已冻结的用户端字段。
 
 ## 传输与消息外壳
 
 - 长连接 TCP。
+- 默认联调地址为 `127.0.0.1:8888`，与成员 A `ServerConfig` 一致；管理员 Mock
+  也监听该端口，避免测试通过后切换真实服务端时仍连向旧端口。
 - 每帧为 4 字节大端 payload 长度，加 UTF-8 JSON payload。
 - 请求包含 `action`、`requestId`、`data`；服务端必须原样返回 `requestId`。
 - `code=0` 表示成功。
@@ -106,11 +110,11 @@
 
 ## 充电桩管理列表
 
-请求 action：`admin.charger.list`
+请求 action：`admin.chargers.list`
 
 ```json
 {
-  "action": "admin.charger.list",
+  "action": "admin.chargers.list",
   "requestId": "admin-3",
   "data": {}
 }
@@ -169,11 +173,11 @@
 
 ## 充电桩远程重启
 
-请求 action：`admin.charger.restart`
+请求 action：`admin.chargers.restart`
 
 ```json
 {
-  "action": "admin.charger.restart",
+  "action": "admin.chargers.restart",
   "requestId": "admin-4",
   "data": { "chargerId": 1001 }
 }
@@ -200,7 +204,7 @@
   `code=2101` 和明确原因；这样不会破坏成员 2 的进行中订单。
 - 空闲、故障、离线桩可以接受本项目中的“远程重启模拟”。实际硬件结果不由
   客户端假定。
-- 成功后客户端不修改本地状态，而是重新调用 `admin.charger.list`；失败时保留
+- 成功后客户端不修改本地状态，而是重新调用 `admin.chargers.list`；失败时保留
   当前列表并显示服务端原因。
 - `chargerId` 不存在或格式错误返回 `1001`；未登录返回 `1003`。
 
@@ -209,11 +213,15 @@
 
 ## 充电桩运维状态变更
 
-请求 action：`admin.charger.status.update`
+> 待服务端冻结扩展：成员 A 当前权威 action 清单尚未包含此接口。客户端、Mock
+> 和测试先按下述契约实现；接入真实数据库前，成员 A 应把 action、字段、事务检查
+> 和 `2101/2103` 写入《协议冻结说明》并实现，不能只依赖客户端限制。
+
+请求 action：`admin.chargers.status.update`
 
 ```json
 {
-  "action": "admin.charger.status.update",
+  "action": "admin.chargers.status.update",
   "requestId": "admin-5",
   "data": {
     "chargerId": 1001,
@@ -280,6 +288,7 @@
         "address": "北京市房山区良乡大学城北路",
         "latitude": 39.731320,
         "longitude": 116.171590,
+        "pricePerKwh": 1.50,
         "totalCount": 4,
         "onlineRate": 100.0,
         "version": 1
@@ -298,6 +307,7 @@
 | `address` | 1～200 字符 | 站点详细地址 |
 | `latitude` | 数字 | WGS-84 纬度，范围 -90～90 |
 | `longitude` | 数字 | WGS-84 经度，范围 -180～180 |
+| `pricePerKwh` | 正数 | 站点统一充电单价，单位元/度；与公共 `station.detail` 一致 |
 | `totalCount` | 非负整数 | 该站全部充电桩数量，包含空闲、在用、故障和离线 |
 | `onlineRate` | 数字 | 服务端聚合的百分数，范围 0～100，不是 0～1 比例 |
 | `version` | 正整数 | 站点资料版本；编辑时用于防止并发覆盖 |
@@ -311,11 +321,14 @@
 - 客户端只校验并显示 `totalCount`、`onlineRate`，不下载桩列表重复计算在线率。
 - 此接口要求当前 TCP 连接已完成管理员登录，未登录返回 `1003`。
 
-> action 名使用成员 1 协议框架中已有的复数形式 `admin.stations.list`。现有
-> Commit 3 的 `admin.charger.list/restart` 暂不在本节点改名，避免破坏已验证功能；
-> 真实服务端接入前需单独统一这组历史名称。
+> action 名使用成员 A 协议框架中的复数资源形式。充电桩列表与重启也统一为
+> `admin.chargers.list/restart`，避免客户端和服务端各保留一套名称。
 
 ## 编辑充电站资料
+
+> 待服务端冻结扩展：成员 A 当前只列出站点查询与创建，尚未实现编辑接口。
+> `version/expectedVersion` 是为避免多个管理员互相覆盖而新增的并发控制字段；
+> 服务端落库时需要为 stations 增加版本列或实现等价的原子比较更新。
 
 请求 action：`admin.stations.update`
 
@@ -329,7 +342,8 @@
     "name": "良乡大学城智慧站",
     "address": "北京市房山区良乡大学城北路",
     "latitude": 39.731320,
-    "longitude": 116.171590
+    "longitude": 116.171590,
+    "pricePerKwh": 1.50
   }
 }
 ```
@@ -349,12 +363,13 @@
 }
 ```
 
-- 可编辑字段只有站名、地址和 WGS-84 经纬度，长度与坐标范围和新增接口一致。
+- 可编辑字段只有站名、地址、WGS-84 经纬度和站点级 `pricePerKwh`，长度、
+  坐标范围及电价约束和新增接口一致。
 - `stationId`、`totalCount`、`onlineRate` 不可编辑；桩数和在线率必须由服务端
   根据设备事实重新聚合。
 - 服务端必须在一个事务中比较 `expectedVersion` 并更新；版本不一致返回 `2102`，
   客户端提示冲突并重新加载，不自动重放旧修改。
-- 更新站名时，`admin.charger.list` 中的 `stationName` 必须来自最新站点记录，
+- 更新站名时，`admin.chargers.list` 中的 `stationName` 必须来自最新站点记录，
   不能在充电桩表中保存一份无法同步的冗余真值。
 - 同名同址的重复站点返回 `1001`。本节点不提供硬删除：存在充电桩、订单或统计
   记录时删除语义需要成员 A 单独设计，不能由客户端直接级联删除。
@@ -387,14 +402,16 @@
     "address": "北京市房山区良乡大学城北路",
     "latitude": 39.731320,
     "longitude": 116.171590,
+    "pricePerKwh": 1.50,
+    "availableCount": 2,
+    "totalCount": 4,
     "chargers": [
       {
         "chargerId": 1001,
-        "chargerCode": "CP-001",
+        "code": "CP-001",
         "type": 0,
-        "power": 120.0,
         "status": 0,
-        "pricePerKwh": 1.20
+        "powerKw": 120.0
       }
     ]
   }
@@ -402,13 +419,22 @@
 ```
 
 - `chargers` 必须始终存在；无桩站点返回空数组 `[]`，不返回 `null`。
-- `version` 与站点列表一致；成功编辑后列表和详情都返回递增的新版本。
-- `chargerCode`、`power` 沿用用户端已冻结字段，管理员端不要求服务端为详情再做
-  `code/powerKw` 别名。
-- `type`、`status` 使用本文前述统一整数枚举；`pricePerKwh` 为非负元/度价格。
+- 公共详情不增加管理员专用的 `version` 字段；编辑使用
+  `admin.stations.list` 返回的版本，避免破坏成员 2 已接入的响应结构。
+- 单桩字段严格使用成员 A 已冻结并实现的 `code`、`powerKw`；不要求服务端提供
+  `chargerCode/power` 别名。
+- `pricePerKwh` 是站点级正数，站内所有桩采用该价格；客户端可在每个桩行重复
+  展示，但不能把它误解为每桩独立字段。
+- `availableCount` 是 `status=0` 的桩数，`totalCount` 等于 `chargers` 数组长度；
+  客户端校验二者，避免展示互相矛盾的统计。
+- `type`、`status` 使用本文前述统一整数枚举。
 - 客户端校验响应 `stationId` 与请求一致，并用选择 generation 忽略迟到详情响应。
 
 ## 新增充电站与初始桩
+
+> 成员 A 已冻结 `admin.stations.create` action 名，但管理员请求/响应字段尚未在
+> 权威文档中补齐；下述字段是依据其现有 stations/chargers 数据模型形成的待冻结
+> 契约，其中 `pricePerKwh` 必须位于站点级。
 
 请求 action：`admin.stations.create`
 
@@ -421,6 +447,7 @@
     "address": "北京市通州区运河东大街",
     "latitude": 39.902500,
     "longitude": 116.656300,
+    "pricePerKwh": 1.50,
     "chargerCount": 4
   }
 }
@@ -431,6 +458,8 @@
 - `name` 去除首尾空白后为 1～60 个字符。
 - `address` 去除首尾空白后为 1～200 个字符。
 - `latitude`、`longitude` 分别在 -90～90、-180～180 范围内。
+- `pricePerKwh` 是站点统一充电单价，必须为有限正数；它与成员 A 的 stations
+  数据模型及公共 `station.detail` 保持一致。
 - `chargerCount` 是 0～100 的整数；允许创建尚未投运的无桩站点。
 - 此接口要求管理员登录；无效字段返回 `1001`，会话失效返回 `1003`，内部或
   事务失败返回 `5000`，具体原因放在 `message`。
@@ -454,8 +483,8 @@
 一致性规则：
 
 - 服务端负责生成 `stationId`、初始 `chargerId` 和唯一可展示的桩编号。
-- 初始桩的类型、功率和电价属于服务端配置/种子策略，不由客户端请求指定；Mock
-  中的交替快慢充数据仅用于界面验证，不是数据库实现的业务默认值。
+- 初始桩的类型、功率属于服务端配置/种子策略，不由客户端请求指定；所有初始桩
+  使用请求中的站点级 `pricePerKwh`。Mock 中交替快慢充仅用于界面验证。
 - 站点和全部初始桩必须在一个数据库事务中创建；任意一步失败整体回滚。
 - 成功时 `createdChargerCount` 必须等于请求的 `chargerCount`，否则客户端将响应
   视为异常并不刷新为成功状态。

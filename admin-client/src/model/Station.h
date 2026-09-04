@@ -13,6 +13,7 @@ struct Station final
     QString address;
     double latitude = 0.0;
     double longitude = 0.0;
+    double pricePerKwh = 0.0;
     qint64 totalCount = 0;
     double onlineRate = 0.0;
     qint64 version = 0;
@@ -52,11 +53,13 @@ struct StationCharger final
 struct StationDetail final
 {
     qint64 stationId = 0;
-    qint64 version = 0;
     QString name;
     QString address;
     double latitude = 0.0;
     double longitude = 0.0;
+    double pricePerKwh = 0.0;
+    qint64 availableCount = 0;
+    qint64 totalCount = 0;
     QList<StationCharger> chargers;
 
     static bool fromJson(const QJsonObject& json,
@@ -70,6 +73,7 @@ struct StationCreateRequest final
     QString address;
     double latitude = 0.0;
     double longitude = 0.0;
+    double pricePerKwh = 0.0;
     int chargerCount = 0;
 
     bool validate(QString* errorMessage) const;
@@ -94,6 +98,7 @@ struct StationUpdateRequest final
     QString address;
     double latitude = 0.0;
     double longitude = 0.0;
+    double pricePerKwh = 0.0;
 
     bool validate(QString* errorMessage) const;
     QJsonObject toJson() const;

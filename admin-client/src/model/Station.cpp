@@ -98,10 +98,19 @@ bool Station::fromJson(const QJsonObject& json,
                            &parsed.latitude, errorMessage)
         || !readCoordinate(json, QStringLiteral("longitude"), -180.0, 180.0,
                            &parsed.longitude, errorMessage)
+        || !readCoordinate(json, QStringLiteral("pricePerKwh"), 0.0,
+                           std::numeric_limits<double>::max(),
+                           &parsed.pricePerKwh, errorMessage)
         || !readInteger(json, QStringLiteral("totalCount"), &parsed.totalCount,
                         false, errorMessage)
         || !readInteger(json, QStringLiteral("version"), &parsed.version,
                         true, errorMessage)) {
+        return false;
+    }
+    if (parsed.pricePerKwh <= 0.0) {
+        if (errorMessage) {
+            *errorMessage = QStringLiteral("字段 pricePerKwh 必须是正数");
+        }
         return false;
     }
 
@@ -210,7 +219,7 @@ bool StationCharger::fromDetailJson(const QJsonObject& json,
     StationCharger parsed;
     if (!readInteger(json, QStringLiteral("chargerId"), &parsed.chargerId,
                      true, errorMessage)
-        || !readRequiredText(json, QStringLiteral("chargerCode"), 80,
+        || !readRequiredText(json, QStringLiteral("code"), 80,
                              &parsed.code, errorMessage)) {
         return false;
     }
@@ -236,10 +245,8 @@ bool StationCharger::fromDetailJson(const QJsonObject& json,
     }
     parsed.status = static_cast<int>(status);
 
-    const QJsonValue powerValue = json.value(QStringLiteral("power"));
-    const QJsonValue priceValue = json.value(QStringLiteral("pricePerKwh"));
+    const QJsonValue powerValue = json.value(QStringLiteral("powerKw"));
     parsed.powerKw = powerValue.toDouble(-1.0);
-    parsed.pricePerKwh = priceValue.toDouble(-1.0);
     if (!powerValue.isDouble() || !std::isfinite(parsed.powerKw)
         || parsed.powerKw <= 0.0) {
         if (errorMessage) {
@@ -247,14 +254,6 @@ bool StationCharger::fromDetailJson(const QJsonObject& json,
         }
         return false;
     }
-    if (!priceValue.isDouble() || !std::isfinite(parsed.pricePerKwh)
-        || parsed.pricePerKwh < 0.0) {
-        if (errorMessage) {
-            *errorMessage = QStringLiteral("充电单价必须是非负数");
-        }
-        return false;
-    }
-
     *charger = parsed;
     return true;
 }
@@ -270,8 +269,6 @@ bool StationDetail::fromJson(const QJsonObject& json,
     StationDetail parsed;
     if (!readInteger(json, QStringLiteral("stationId"), &parsed.stationId,
                      true, errorMessage)
-        || !readInteger(json, QStringLiteral("version"), &parsed.version,
-                        true, errorMessage)
         || !readRequiredText(json, QStringLiteral("name"), 60,
                              &parsed.name, errorMessage)
         || !readRequiredText(json, QStringLiteral("address"), 200,
@@ -279,7 +276,26 @@ bool StationDetail::fromJson(const QJsonObject& json,
         || !readCoordinate(json, QStringLiteral("latitude"), -90.0, 90.0,
                            &parsed.latitude, errorMessage)
         || !readCoordinate(json, QStringLiteral("longitude"), -180.0, 180.0,
-                           &parsed.longitude, errorMessage)) {
+                           &parsed.longitude, errorMessage)
+        || !readCoordinate(json, QStringLiteral("pricePerKwh"), 0.0,
+                           std::numeric_limits<double>::max(),
+                           &parsed.pricePerKwh, errorMessage)
+        || !readInteger(json, QStringLiteral("availableCount"),
+                        &parsed.availableCount, false, errorMessage)
+        || !readInteger(json, QStringLiteral("totalCount"),
+                        &parsed.totalCount, false, errorMessage)) {
+        return false;
+    }
+    if (parsed.pricePerKwh <= 0.0) {
+        if (errorMessage) {
+            *errorMessage = QStringLiteral("站点充电单价必须是正数");
+        }
+        return false;
+    }
+    if (parsed.availableCount > parsed.totalCount) {
+        if (errorMessage) {
+            *errorMessage = QStringLiteral("空闲桩数量不能大于总桩数");
+        }
         return false;
     }
 
@@ -319,8 +335,27 @@ bool StationDetail::fromJson(const QJsonObject& json,
             }
             return false;
         }
+        charger.pricePerKwh = parsed.pricePerKwh;
         ids.insert(charger.chargerId);
         parsed.chargers.append(charger);
+    }
+    if (parsed.chargers.size() != parsed.totalCount) {
+        if (errorMessage) {
+            *errorMessage = QStringLiteral("站内桩数组数量与 totalCount 不一致");
+        }
+        return false;
+    }
+    int idleCount = 0;
+    for (const StationCharger& charger : parsed.chargers) {
+        if (charger.status == protocol::ChargerStatusIdle) {
+            ++idleCount;
+        }
+    }
+    if (idleCount != parsed.availableCount) {
+        if (errorMessage) {
+            *errorMessage = QStringLiteral("空闲桩数量与 availableCount 不一致");
+        }
+        return false;
     }
 
     *detail = parsed;
@@ -358,6 +393,12 @@ bool StationCreateRequest::validate(QString* errorMessage) const
         }
         return false;
     }
+    if (!std::isfinite(pricePerKwh) || pricePerKwh <= 0.0) {
+        if (errorMessage) {
+            *errorMessage = QStringLiteral("充电单价必须是正数");
+        }
+        return false;
+    }
     if (chargerCount < 0 || chargerCount > 100) {
         if (errorMessage) {
             *errorMessage = QStringLiteral("初始电桩数量必须在 0～100 之间");
@@ -377,6 +418,7 @@ QJsonObject StationCreateRequest::toJson() const
         {QStringLiteral("address"), address.trimmed()},
         {QStringLiteral("latitude"), latitude},
         {QStringLiteral("longitude"), longitude},
+        {QStringLiteral("pricePerKwh"), pricePerKwh},
         {QStringLiteral("chargerCount"), chargerCount},
     };
 }
@@ -409,6 +451,7 @@ bool StationUpdateRequest::validate(QString* errorMessage) const
     common.address = address;
     common.latitude = latitude;
     common.longitude = longitude;
+    common.pricePerKwh = pricePerKwh;
     common.chargerCount = 0;
     if (stationId <= 0) {
         if (errorMessage) {
@@ -434,6 +477,7 @@ QJsonObject StationUpdateRequest::toJson() const
         {QStringLiteral("address"), address.trimmed()},
         {QStringLiteral("latitude"), latitude},
         {QStringLiteral("longitude"), longitude},
+        {QStringLiteral("pricePerKwh"), pricePerKwh},
     };
 }
 

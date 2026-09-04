@@ -85,6 +85,7 @@ QJsonArray mockStations()
             {QStringLiteral("address"), QStringLiteral("北京市房山区良乡大学城北路")},
             {QStringLiteral("latitude"), 39.731320},
             {QStringLiteral("longitude"), 116.171590},
+            {QStringLiteral("pricePerKwh"), 1.50},
             {QStringLiteral("version"), 1},
         },
         QJsonObject {
@@ -93,6 +94,7 @@ QJsonArray mockStations()
             {QStringLiteral("address"), QStringLiteral("北京市海淀区中关村大街")},
             {QStringLiteral("latitude"), 39.983420},
             {QStringLiteral("longitude"), 116.316510},
+            {QStringLiteral("pricePerKwh"), 1.80},
             {QStringLiteral("version"), 1},
         },
         QJsonObject {
@@ -101,6 +103,7 @@ QJsonArray mockStations()
             {QStringLiteral("address"), QStringLiteral("北京市海淀区西山产业园")},
             {QStringLiteral("latitude"), 39.994610},
             {QStringLiteral("longitude"), 116.196780},
+            {QStringLiteral("pricePerKwh"), 1.60},
             {QStringLiteral("version"), 1},
         },
         QJsonObject {
@@ -109,6 +112,7 @@ QJsonArray mockStations()
             {QStringLiteral("address"), QStringLiteral("北京市大兴区亦庄新城")},
             {QStringLiteral("latitude"), 39.794310},
             {QStringLiteral("longitude"), 116.506840},
+            {QStringLiteral("pricePerKwh"), 1.30},
             {QStringLiteral("version"), 1},
         },
     };
@@ -141,7 +145,7 @@ public:
 
     bool listen()
     {
-        return server_.listen(QHostAddress::LocalHost, 9000);
+        return server_.listen(QHostAddress::LocalHost, 8888);
     }
 
 private:
@@ -196,6 +200,7 @@ private:
             return {};
         }
         QJsonArray detailChargers;
+        int availableCount = 0;
         for (const QJsonValue chargerValue : chargers_) {
             const QJsonObject charger = chargerValue.toObject();
             if (static_cast<qint64>(charger.value(
@@ -205,16 +210,23 @@ private:
             detailChargers.append(QJsonObject {
                 {QStringLiteral("chargerId"),
                  charger.value(QStringLiteral("chargerId"))},
-                {QStringLiteral("chargerCode"),
+                {QStringLiteral("code"),
                  charger.value(QStringLiteral("code"))},
                 {QStringLiteral("type"), charger.value(QStringLiteral("type"))},
-                {QStringLiteral("power"),
+                {QStringLiteral("powerKw"),
                  charger.value(QStringLiteral("powerKw"))},
                 {QStringLiteral("status"), charger.value(QStringLiteral("status"))},
-                {QStringLiteral("pricePerKwh"),
-                 charger.value(QStringLiteral("pricePerKwh"))},
             });
+            if (charger.value(QStringLiteral("status")).toInt()
+                == protocol::ChargerStatusIdle) {
+                ++availableCount;
+            }
         }
+        // station.detail 严格模拟成员 A 已实现的公共接口：电价在站点级，
+        // 单桩使用 code/powerKw，不携带管理员扩展字段 version。
+        station.remove(QStringLiteral("version"));
+        station.insert(QStringLiteral("availableCount"), availableCount);
+        station.insert(QStringLiteral("totalCount"), detailChargers.size());
         station.insert(QStringLiteral("chargers"), detailChargers);
         return station;
     }
@@ -519,11 +531,14 @@ private:
                     QStringLiteral("longitude"));
                 const QJsonValue countValue = requestData.value(
                     QStringLiteral("chargerCount"));
+                const QJsonValue priceValue = requestData.value(
+                    QStringLiteral("pricePerKwh"));
                 const double latitude = latitudeValue.toDouble(
                     std::numeric_limits<double>::quiet_NaN());
                 const double longitude = longitudeValue.toDouble(
                     std::numeric_limits<double>::quiet_NaN());
                 const double countNumber = countValue.toDouble(-1.0);
+                const double pricePerKwh = priceValue.toDouble(-1.0);
                 const bool valid = !name.isEmpty() && name.size() <= 60
                     && !address.isEmpty() && address.size() <= 200
                     && latitudeValue.isDouble() && std::isfinite(latitude)
@@ -532,7 +547,9 @@ private:
                     && longitude >= -180.0 && longitude <= 180.0
                     && countValue.isDouble() && std::isfinite(countNumber)
                     && countNumber >= 0.0 && countNumber <= 100.0
-                    && std::floor(countNumber) == countNumber;
+                    && std::floor(countNumber) == countNumber
+                    && priceValue.isDouble() && std::isfinite(pricePerKwh)
+                    && pricePerKwh > 0.0;
                 bool duplicate = false;
                 if (valid) {
                     for (const QJsonValue value : stations_) {
@@ -573,6 +590,7 @@ private:
                         {QStringLiteral("address"), address},
                         {QStringLiteral("latitude"), latitude},
                         {QStringLiteral("longitude"), longitude},
+                        {QStringLiteral("pricePerKwh"), pricePerKwh},
                         {QStringLiteral("version"), 1},
                     });
                     const int chargerCount = static_cast<int>(countNumber);
@@ -593,7 +611,6 @@ private:
                             {QStringLiteral("status"), protocol::ChargerStatusIdle},
                             {QStringLiteral("totalChargeCount"), 0},
                             {QStringLiteral("totalChargeDurationSeconds"), 0},
-                            {QStringLiteral("pricePerKwh"), fast ? 1.20 : 0.80},
                         });
                     }
                     response.insert(QStringLiteral("message"),
@@ -619,6 +636,8 @@ private:
                     QStringLiteral("latitude"));
                 const QJsonValue longitudeValue = requestData.value(
                     QStringLiteral("longitude"));
+                const QJsonValue priceValue = requestData.value(
+                    QStringLiteral("pricePerKwh"));
                 const QString name = requestData.value(
                     QStringLiteral("name")).toString().trimmed();
                 const QString address = requestData.value(
@@ -629,6 +648,7 @@ private:
                     std::numeric_limits<double>::quiet_NaN());
                 const double longitude = longitudeValue.toDouble(
                     std::numeric_limits<double>::quiet_NaN());
+                const double pricePerKwh = priceValue.toDouble(-1.0);
                 const bool valid = stationIdValue.isDouble()
                     && std::isfinite(stationIdNumber) && stationIdNumber > 0.0
                     && stationIdNumber <= 9007199254740991.0
@@ -640,7 +660,9 @@ private:
                     && latitudeValue.isDouble() && std::isfinite(latitude)
                     && latitude >= -90.0 && latitude <= 90.0
                     && longitudeValue.isDouble() && std::isfinite(longitude)
-                    && longitude >= -180.0 && longitude <= 180.0;
+                    && longitude >= -180.0 && longitude <= 180.0
+                    && priceValue.isDouble() && std::isfinite(pricePerKwh)
+                    && pricePerKwh > 0.0;
                 int stationIndex = -1;
                 bool duplicate = false;
                 if (valid) {
@@ -685,6 +707,7 @@ private:
                         station.insert(QStringLiteral("address"), address);
                         station.insert(QStringLiteral("latitude"), latitude);
                         station.insert(QStringLiteral("longitude"), longitude);
+                        station.insert(QStringLiteral("pricePerKwh"), pricePerKwh);
                         station.insert(QStringLiteral("version"), nextVersion);
                         stations_.replace(stationIndex, station);
                         for (int index = 0; index < chargers_.size(); ++index) {
@@ -737,10 +760,10 @@ int main(int argc, char* argv[])
     QCoreApplication application(argc, argv);
     MockServer server;
     if (!server.listen()) {
-        std::fprintf(stderr, "failed to listen on 127.0.0.1:9000\n");
+        std::fprintf(stderr, "failed to listen on 127.0.0.1:8888\n");
         return 1;
     }
-    std::printf("admin mock server listening on 127.0.0.1:9000\n");
+    std::printf("admin mock server listening on 127.0.0.1:8888\n");
     std::fflush(stdout);
     return application.exec();
 }

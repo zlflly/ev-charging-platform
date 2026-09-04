@@ -64,7 +64,7 @@ flowchart LR
   页面重新查询站点列表，再按新 `stationId` 查询详情。
 - 站点详情允许多个请求在网络层并发；页面使用递增 generation 忽略较早选择的
   迟到响应，避免快速切换站点时旧数据覆盖当前详情。
-- 站点编辑只提交名称、地址和经纬度，并携带列表返回的 `version`；服务端使用
+- 站点编辑只提交名称、地址、经纬度和站点级电价，并携带列表返回的 `version`；服务端使用
   乐观锁拒绝旧版本，客户端冲突后重新查询，不悄悄覆盖其他管理员的修改。
 - 总桩数与在线率是服务端派生字段，不出现在编辑表单；站点 ID 永远不可变。
 - 设备状态调整携带 `expectedStatus` 和必填原因。目标只允许空闲、故障、离线，
@@ -102,7 +102,8 @@ flowchart LR
 - 真实列表、累计次数、累计时长、状态变化和重启权限都由成员 1 的服务端决定。
 - 每次新增 action 必须同步更新 `docs/admin-protocol.md`、Mock、冒烟测试和
   README，直到服务端协议冻结后再移除对应假设。
-- Commit 4 的站点协议由客户端先行冻结，复用成员 1 已列出的
-  `admin.stations.list`、`admin.stations.create` 和用户端既有 `station.detail`，
-  并补充 `admin.stations.update` 与 `admin.charger.status.update`；
-  成员 1 后续实现数据库时应按 `docs/admin-protocol.md` 对接。
+- 公共 `station.detail` 严格采用成员 A 已实现的响应：站内桩字段为
+  `code/powerKw`，`pricePerKwh` 位于站点级，并校验 `availableCount/totalCount`。
+- 管理员资源 action 采用成员 A 文档中的复数形式 `admin.chargers.*` 和
+  `admin.stations.*`。`admin.stations.update`、`admin.chargers.status.update`
+  及其并发错误码属于客户端提出、等待成员 A 纳入权威文档的扩展。

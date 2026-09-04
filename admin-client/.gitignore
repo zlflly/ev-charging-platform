@@ -7,3 +7,6 @@ CMakeFiles/
 cmake_install.cmake
 Makefile
 moc_*
+
+# 私人对话交接记录不属于项目源代码，不得提交到远端。
+docs/EV管理员客户端_新对话交接与排障.md

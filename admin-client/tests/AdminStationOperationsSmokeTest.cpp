@@ -59,6 +59,7 @@ int main(int argc, char* argv[])
                 update.address = original.address;
                 update.latitude = original.latitude;
                 update.longitude = original.longitude;
+                update.pricePerKwh = 1.65;
                 const bool updateStarted = api.updateStation(
                     update,
                     [&api, update](std::optional<StationUpdateResult> result,
@@ -104,8 +105,10 @@ int main(int argc, char* argv[])
                                             [&api, stationId](
                                                 std::optional<StationDetail> detail,
                                                 const QString&) {
-                                                if (!detail || detail->version != 2
-                                                    || detail->chargers.isEmpty()) {
+                                                if (!detail || detail->chargers.isEmpty()
+                                                    || detail->pricePerKwh != 1.65
+                                                    || detail->totalCount
+                                                        != detail->chargers.size()) {
                                                     finish(false, "STATION OPERATIONS SMOKE TEST FAILED (detail)");
                                                     return;
                                                 }
