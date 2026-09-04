@@ -7,12 +7,6 @@
 <style>
   html, body { margin: 0; padding: 0; height: 100%; background: #06111f; overflow: hidden; }
   #mapContainer { position: absolute; inset: 0; }
-  /* Keep the map in the same deep-blue cockpit language even when the
-     provider returns its default light tile theme (for example while a
-     custom theme is still warming up in the web view cache). */
-  .amap-layers { filter: brightness(.62) saturate(.92) contrast(1.08); }
-  .map-tint { position: absolute; inset: 0; pointer-events: none;
-    background: rgba(3, 16, 32, .68); z-index: 20; }
   .amap-logo, .amap-copyright { opacity: 0.28 !important; }
   .current-pin, .destination-pin { position: relative; width: 42px; height: 42px; }
   .current-pin:before {
@@ -90,8 +84,8 @@
     var startMarker = new AMap.Marker({ position: origin, anchor: "center", zIndex: 60, content: iconContent("current") });
     var destinationMarker = new AMap.Marker({ position: destination, anchor: "bottom-center", zIndex: 61, content: iconContent("destination") });
     var callout = new AMap.Marker({
-      position: destination, anchor: "right-bottom",
-      offset: new AMap.Pixel(-24, -34), zIndex: 62,
+      position: destination, anchor: "bottom-right",
+      offset: new AMap.Pixel(-24, -72), zIndex: 62,
       content: '<div class="route-callout"><strong>' + escapeHtml(destinationName) +
         '</strong><span><em>' + escapeHtml(distanceText) + '</em>　|　' +
         escapeHtml(etaText) + '</span></div>'
@@ -105,10 +99,6 @@
       lineJoin: "round", lineCap: "round", showDir: true, zIndex: 41
     });
     map.add([glowLine, routeLine, startMarker, destinationMarker, callout]);
-    var tint = document.createElement("div");
-    tint.className = "map-tint";
-    document.getElementById("mapContainer").appendChild(tint);
-
     function pointAtProgress(progress) {
       if (!routePath || routePath.length === 0) return origin;
       if (routePath.length === 1) return routePath[0];
@@ -135,6 +125,9 @@
 
     window.__navigationMap = {
       setProgress: function (progress) { startMarker.setPosition(pointAtProgress(progress)); },
+      setUserPosition: function (longitude, latitude) {
+        startMarker.setPosition([longitude, latitude]);
+      },
       recenter: function () { map.setZoomAndCenter(13, startMarker.getPosition()); },
       zoomIn: function () { map.zoomIn(); },
       zoomOut: function () { map.zoomOut(); },

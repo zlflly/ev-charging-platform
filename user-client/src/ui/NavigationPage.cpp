@@ -1,8 +1,10 @@
 #include "ui/NavigationPage.h"
 
 #include "config/AppConfig.h"
+#include "geo/Geocoder.h"
 #include "net/NetworkClient.h"
 #include "session/Session.h"
+#include "ui/SvgIcon.h"
 #include "ui/theme/Theme.h"
 
 #include <QApplication>
@@ -10,13 +12,14 @@
 #include <QDateTime>
 #include <QFile>
 #include <QFrame>
-#include <QIcon>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLabel>
+#include <QLineEdit>
 #include <QLinearGradient>
 #include <QPainter>
 #include <QPainterPath>
+#include <QPolygonF>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QTimer>
@@ -25,6 +28,10 @@
 #include <QWebEngineView>
 #include <QMouseEvent>
 #include <QtMath>
+
+#include <cmath>
+#include <limits>
+#include <QStringList>
 
 namespace {
 
@@ -42,14 +49,7 @@ QString cssRgba(const QColor& color, int alpha)
 QPixmap tintedSvgPixmap(const QString& resourcePath, const QSize& size,
                         const QColor& color)
 {
-    const QPixmap source = QIcon(resourcePath).pixmap(size);
-    if (source.isNull()) return {};
-    QPixmap tinted(size);
-    tinted.fill(color);
-    QPainter painter(&tinted);
-    painter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
-    painter.drawPixmap(0, 0, source);
-    return tinted;
+    return svg::tintedPixmap(resourcePath, size, color);
 }
 
 void setLabelStyle(QLabel* label, int pixelSize, const QColor& color,
@@ -101,22 +101,32 @@ void styleSecondaryButton(QPushButton* button, int fontSize = 18)
              cssColor(theme::primaryBlue()), cssRgba(theme::primaryBlue(), 32)));
 }
 
+void styleLocationEdit(QLineEdit* edit)
+{
+    QFont font(QStringLiteral("Microsoft YaHei UI"));
+    font.setPixelSize(15);
+    font.setWeight(QFont::DemiBold);
+    edit->setFont(font);
+    edit->setFrame(false);
+    edit->setStyleSheet(QStringLiteral(
+        "QLineEdit { color: %1; background: %2; border: 1px solid %3;"
+        " border-radius: 10px; padding: 0 10px; }"
+        "QLineEdit:focus { border-color: %4; background: %5; }")
+        .arg(cssColor(theme::textPrimary()), cssRgba(theme::inputFill(), 220),
+             cssColor(theme::inputBorder()), cssColor(theme::primaryBlue()),
+             cssRgba(theme::inputFill(), 245)));
+}
+
 class NavIconButton : public QPushButton
 {
 public:
-    enum class Kind { Back, Close, Share, Mute, Locate, ZoomIn, ZoomOut, Layers, Swap };
+    enum class Kind { Back, Close, Share, Locate, ZoomIn, ZoomOut, Layers, Swap };
 
     NavIconButton(Kind kind, QWidget* parent = nullptr)
         : QPushButton(parent), kind_(kind)
     {
         setCursor(Qt::PointingHandCursor);
         setStyleSheet(QStringLiteral("background: transparent; border: none;"));
-    }
-
-    void setMuted(bool muted)
-    {
-        muted_ = muted;
-        update();
     }
 
 protected:
@@ -143,7 +153,7 @@ protected:
         case Kind::Locate: iconPath = QStringLiteral(":/resources/icons/locate.svg"); break;
         case Kind::ZoomIn: iconPath = QStringLiteral(":/resources/icons/plus.svg"); break;
         case Kind::ZoomOut: iconPath = QStringLiteral(":/resources/icons/minus.svg"); break;
-        case Kind::Layers: iconPath = QStringLiteral(":/resources/icons/layers.svg"); break;
+        case Kind::Layers: iconPath = QStringLiteral(":/resources/icons/overview.svg"); break;
         default: break;
         }
         if (!iconPath.isEmpty()) {
@@ -178,19 +188,6 @@ protected:
             painter.drawLine(QPointF(17, 17), QPointF(30, 6));
             painter.drawLine(QPointF(30, 6), QPointF(30, 15));
             painter.drawLine(QPointF(30, 6), QPointF(21, 6));
-            break;
-        case Kind::Mute:
-            painter.drawLine(QPointF(7, cy - 5), QPointF(13, cy - 5));
-            painter.drawLine(QPointF(13, cy - 5), QPointF(19, cy - 11));
-            painter.drawLine(QPointF(19, cy - 11), QPointF(19, cy + 11));
-            painter.drawLine(QPointF(19, cy + 11), QPointF(13, cy + 5));
-            painter.drawLine(QPointF(13, cy + 5), QPointF(7, cy + 5));
-            painter.drawLine(QPointF(7, cy + 5), QPointF(7, cy - 5));
-            painter.drawLine(QPointF(25, cy - 6), QPointF(34, cy + 6));
-            painter.drawLine(QPointF(34, cy - 6), QPointF(25, cy + 6));
-            if (!muted_) {
-                painter.drawArc(QRectF(18, cy - 11, 17, 22), -55 * 16, 110 * 16);
-            }
             break;
         case Kind::Locate:
             painter.drawEllipse(QPointF(cx, cy), 9, 9);
@@ -231,66 +228,6 @@ protected:
 
 private:
     Kind kind_;
-    bool muted_ = false;
-};
-
-class ModeButton : public QPushButton
-{
-public:
-    enum class Kind { Car, Walk, Bike };
-
-    ModeButton(Kind kind, const QString& label, QWidget* parent = nullptr)
-        : QPushButton(parent), kind_(kind), label_(label)
-    {
-        setCursor(Qt::PointingHandCursor);
-        setStyleSheet(QStringLiteral("background: transparent; border: none;"));
-    }
-
-    void setSelected(bool selected)
-    {
-        selected_ = selected;
-        update();
-    }
-
-protected:
-    void paintEvent(QPaintEvent*) override
-    {
-        QPainter painter(this);
-        painter.setRenderHint(QPainter::Antialiasing, true);
-        const QColor accent = selected_ ? theme::primaryBlue() : theme::textSecondary();
-        QColor fill = selected_ ? theme::primaryBlue() : theme::cardFill();
-        fill.setAlpha(selected_ ? 225 : 170);
-        painter.setBrush(fill);
-        painter.setPen(QPen(selected_ ? QColor(0x4B, 0xA9, 0xFF) : theme::cardBorder(), 1));
-        painter.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 20, 20);
-
-        const qreal cx = 34;
-        const qreal cy = height() / 2.0;
-        const QString iconPath = kind_ == Kind::Car
-            ? QStringLiteral(":/resources/icons/drive.svg")
-            : kind_ == Kind::Walk
-                ? QStringLiteral(":/resources/icons/walk.svg")
-                : QStringLiteral(":/resources/icons/riding.svg");
-        const QPixmap icon = tintedSvgPixmap(iconPath, QSize(27, 27),
-                                             selected_ ? Qt::white : accent);
-        if (!icon.isNull()) {
-            painter.drawPixmap(qRound(cx - icon.width() / 2.0),
-                               qRound(cy - icon.height() / 2.0), icon);
-        }
-
-        QFont font(QStringLiteral("Microsoft YaHei UI"));
-        font.setPixelSize(17);
-        font.setWeight(QFont::DemiBold);
-        painter.setFont(font);
-        painter.setPen(selected_ ? Qt::white : theme::textPrimary());
-        painter.drawText(QRectF(55, 0, width() - 59, height()),
-                         Qt::AlignVCenter | Qt::AlignLeft, label_);
-    }
-
-private:
-    Kind kind_;
-    QString label_;
-    bool selected_ = false;
 };
 
 class TurnArrowWidget : public QFrame
@@ -301,68 +238,70 @@ public:
         setStyleSheet(QStringLiteral("background: transparent; border: none;"));
     }
 
+    void setInstruction(const QString& instruction)
+    {
+        instruction_ = instruction;
+        update();
+    }
+
 protected:
     void paintEvent(QPaintEvent*) override
     {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing, true);
-        const QPixmap icon = tintedSvgPixmap(
-            QStringLiteral(":/resources/icons/turn_right.svg"), QSize(52, 52),
-            theme::textPrimary());
-        if (!icon.isNull()) {
-            painter.drawPixmap((width() - icon.width()) / 2,
-                               (height() - icon.height()) / 2, icon);
+        if (instruction_.contains(QStringLiteral("到达"))) {
+            painter.setPen(QPen(theme::success(), 3));
+            painter.setBrush(Qt::NoBrush);
+            painter.drawEllipse(rect().adjusted(10, 10, -10, -10));
+            painter.setPen(QPen(theme::success(), 4, Qt::SolidLine,
+                                Qt::RoundCap, Qt::RoundJoin));
+            painter.drawLine(QPointF(width() * .31, height() * .51),
+                             QPointF(width() * .45, height() * .66));
+            painter.drawLine(QPointF(width() * .45, height() * .66),
+                             QPointF(width() * .72, height() * .36));
             return;
         }
-        painter.setPen(QPen(theme::textPrimary(), 8, Qt::SolidLine,
+
+        const qreal centerX = width() * 0.50;
+        const qreal centerY = height() * 0.36;
+        const qreal leftX = width() * 0.28;
+        const qreal rightX = width() * 0.82;
+        painter.setPen(QPen(theme::textPrimary(), 9, Qt::SolidLine,
                             Qt::RoundCap, Qt::RoundJoin));
-        painter.drawLine(QPointF(19, height() - 10), QPointF(19, 21));
-        painter.drawLine(QPointF(19, 21), QPointF(width() - 15, 21));
-        painter.drawLine(QPointF(width() - 15, 21), QPointF(width() - 29, 10));
-        painter.drawLine(QPointF(width() - 15, 21), QPointF(width() - 29, 32));
-    }
-};
+        if (instruction_.contains(QStringLiteral("直行")) ||
+            instruction_.contains(QStringLiteral("沿")) ||
+            instruction_.contains(QStringLiteral("行驶"))) {
+            painter.drawLine(QPointF(centerX, height() * .82),
+                             QPointF(centerX, height() * .24));
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(theme::textPrimary());
+            QPolygonF arrow;
+            arrow << QPointF(centerX, height() * .10)
+                  << QPointF(centerX - 13, height() * .30)
+                  << QPointF(centerX + 13, height() * .30);
+            painter.drawPolygon(arrow);
+            return;
+        }
 
-class LaneGuideWidget : public QFrame
-{
-public:
-    explicit LaneGuideWidget(QWidget* parent = nullptr) : QFrame(parent)
-    {
-        setStyleSheet(QStringLiteral("background: transparent; border: none;"));
+        const bool leftTurn = instruction_.contains(QStringLiteral("左转")) ||
+                              instruction_.contains(QStringLiteral("向左"));
+        const qreal turnX = leftTurn ? rightX : leftX;
+        const qreal exitX = leftTurn ? leftX : rightX;
+        painter.drawLine(QPointF(turnX, height() * 0.82),
+                         QPointF(turnX, centerY));
+        painter.drawLine(QPointF(turnX, centerY), QPointF(exitX, centerY));
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(theme::textPrimary());
+        QPolygonF arrow;
+        const qreal direction = leftTurn ? -1.0 : 1.0;
+        arrow << QPointF(exitX + direction * 13, centerY)
+              << QPointF(exitX - direction * 3, centerY - 13)
+              << QPointF(exitX - direction * 3, centerY + 13);
+        painter.drawPolygon(arrow);
     }
 
-protected:
-    void paintEvent(QPaintEvent*) override
-    {
-        QPainter painter(this);
-        painter.setRenderHint(QPainter::Antialiasing, true);
-        QColor fill = theme::inputFill();
-        fill.setAlpha(220);
-        painter.setBrush(fill);
-        painter.setPen(QPen(theme::cardBorder(), 1));
-        painter.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 12, 12);
-        const int segment = width() / 4;
-        painter.setPen(QPen(theme::cardBorder(), 1, Qt::DashLine));
-        for (int i = 1; i < 4; ++i) {
-            painter.drawLine(QPointF(i * segment, 8), QPointF(i * segment, height() - 8));
-        }
-        const QPixmap straight = tintedSvgPixmap(
-            QStringLiteral(":/resources/icons/straight.svg"), QSize(26, 26),
-            theme::textMuted());
-        const QPixmap right = tintedSvgPixmap(
-            QStringLiteral(":/resources/icons/turn_right.svg"), QSize(26, 26),
-            theme::primaryBlue());
-        if (!straight.isNull()) {
-            painter.drawPixmap(segment / 2 - straight.width() / 2,
-                               (height() - straight.height()) / 2, straight);
-            painter.drawPixmap(segment + segment / 2 - straight.width() / 2,
-                               (height() - straight.height()) / 2, straight);
-        }
-        if (!right.isNull()) {
-            painter.drawPixmap(segment * 3 + segment / 2 - right.width() / 2,
-                               (height() - right.height()) / 2, right);
-        }
-    }
+private:
+    QString instruction_;
 };
 
 class ArrivalCard : public QFrame
@@ -443,12 +382,7 @@ NavigationPage::NavigationPage(NetworkClient* networkClient, QWidget* parent)
     : QWidget(parent)
     , networkClient_(networkClient)
     , routePlanner_(new RoutePlanner(this))
-    , previewMode_(qEnvironmentVariableIsSet("EV_HOME_PREVIEW") ||
-                   qEnvironmentVariableIsSet("EV_DETAIL_PREVIEW") ||
-                   qEnvironmentVariableIsSet("EV_NAVIGATION_PREVIEW") ||
-                   qEnvironmentVariableIsSet("EV_NAVIGATION_ACTIVE_PREVIEW") ||
-                   qEnvironmentVariableIsSet("EV_NAVIGATION_FINISHED_PREVIEW") ||
-                   !qgetenv("EV_NAVIGATION_SCREENSHOT_PATH").isEmpty())
+    , geocoder_(new Geocoder(this))
 {
     setObjectName(QStringLiteral("NavigationPage"));
     setAttribute(Qt::WA_StyledBackground, true);
@@ -465,6 +399,10 @@ NavigationPage::NavigationPage(NetworkClient* networkClient, QWidget* parent)
             this, &NavigationPage::onRouteReady);
     connect(routePlanner_, &RoutePlanner::error,
             this, &NavigationPage::onRouteError);
+    connect(geocoder_, &Geocoder::geocoded,
+            this, &NavigationPage::onGeocoded);
+    connect(geocoder_, &Geocoder::error,
+            this, &NavigationPage::onGeocoderError);
 }
 
 void NavigationPage::buildUi()
@@ -489,30 +427,33 @@ void NavigationPage::buildUi()
 
     routeSummaryCard_ = new QFrame(this);
     stylePanel(routeSummaryCard_, 18, 230);
-    originLabel_ = new QLabel(this);
-    destinationLabel_ = new QLabel(this);
-    routeSummaryMetaLabel_ = new QLabel(this);
-    setLabelStyle(originLabel_, 16, theme::textPrimary());
-    setLabelStyle(destinationLabel_, 16, theme::textPrimary());
+    originCaptionLabel_ = new QLabel(QStringLiteral("当前位置"), routeSummaryCard_);
+    destinationCaptionLabel_ = new QLabel(QStringLiteral("充电站"), routeSummaryCard_);
+    setLabelStyle(originCaptionLabel_, 14, theme::textSecondary(), true,
+                  Qt::AlignLeft | Qt::AlignVCenter);
+    setLabelStyle(destinationCaptionLabel_, 14, theme::textSecondary(), true,
+                  Qt::AlignLeft | Qt::AlignVCenter);
+    originEdit_ = new QLineEdit(routeSummaryCard_);
+    destinationEdit_ = new QLineEdit(routeSummaryCard_);
+    originEdit_->setPlaceholderText(QStringLiteral("输入当前位置或地址"));
+    destinationEdit_->setPlaceholderText(QStringLiteral("输入充电站或地址"));
+    originEdit_->setAccessibleName(QStringLiteral("当前位置"));
+    destinationEdit_->setAccessibleName(QStringLiteral("充电站"));
+    styleLocationEdit(originEdit_);
+    styleLocationEdit(destinationEdit_);
+    connect(originEdit_, &QLineEdit::returnPressed,
+            this, &NavigationPage::onOriginReturnPressed);
+    connect(destinationEdit_, &QLineEdit::returnPressed,
+            this, &NavigationPage::onDestinationReturnPressed);
+    routeSummaryMetaLabel_ = new QLabel(routeSummaryCard_);
     setLabelStyle(routeSummaryMetaLabel_, 13, theme::textSecondary(), false,
                   Qt::AlignRight | Qt::AlignVCenter);
+    routeSummaryMetaLabel_->setVisible(false);
     swapRouteButton_ = new NavIconButton(NavIconButton::Kind::Swap, routeSummaryCard_);
     swapRouteButton_->setToolTip(QStringLiteral("交换起终点"));
     connect(swapRouteButton_, &QPushButton::clicked, this, [this] {
-        planningHintLabel_->setText(QStringLiteral("当前仅支持从当前位置前往充电站"));
+        onSwapLocationsClicked();
     });
-
-    const QList<QPair<ModeButton::Kind, QString>> modes = {
-        {ModeButton::Kind::Car, QStringLiteral("驾车")},
-        {ModeButton::Kind::Walk, QStringLiteral("步行")},
-        {ModeButton::Kind::Bike, QStringLiteral("骑行")},
-    };
-    for (const auto& mode : modes) {
-        auto* button = new ModeButton(mode.first, mode.second, this);
-        modeButtons_.append(button);
-        connect(button, &QPushButton::clicked,
-                this, &NavigationPage::onModeClicked);
-    }
 
     mapFrame_ = new QFrame(this);
     mapFrame_->setObjectName(QStringLiteral("NavigationMapFrame"));
@@ -580,24 +521,11 @@ void NavigationPage::buildUi()
     turnArrowWidget_ = new TurnArrowWidget(guidanceCard_);
     guidanceDistanceLabel_ = new QLabel(guidanceCard_);
     guidanceRoadLabel_ = new QLabel(guidanceCard_);
-    guidanceTurnLabel_ = new QLabel(guidanceCard_);
     setLabelStyle(guidanceDistanceLabel_, 17, theme::textPrimary(), false,
                   Qt::AlignLeft | Qt::AlignVCenter);
-    setLabelStyle(guidanceRoadLabel_, 18, theme::textPrimary(), true);
-    setLabelStyle(guidanceTurnLabel_, 17, theme::textPrimary(), false);
-    muteButton_ = new NavIconButton(NavIconButton::Kind::Mute, guidanceCard_);
-    muteButton_->setToolTip(QStringLiteral("静音"));
-    connect(muteButton_, &QPushButton::clicked, [this] {
-        muted_ = !muted_;
-        static_cast<NavIconButton*>(muteButton_)->setMuted(muted_);
-    });
-    laneGuideWidget_ = new LaneGuideWidget(guidanceCard_);
-    guidanceTimeLabel_ = new QLabel(guidanceCard_);
-    guidanceDistanceMetaLabel_ = new QLabel(guidanceCard_);
-    guidanceEtaLabel_ = new QLabel(guidanceCard_);
-    for (QLabel* label : {guidanceTimeLabel_, guidanceDistanceMetaLabel_, guidanceEtaLabel_}) {
-        setLabelStyle(label, 14, theme::textPrimary(), false, Qt::AlignCenter);
-    }
+    setLabelStyle(guidanceRoadLabel_, 15, theme::textPrimary(), true);
+    guidanceRoadLabel_->setWordWrap(true);
+    guidanceDistanceLabel_->setTextFormat(Qt::RichText);
 
     navigationBottomCard_ = new QFrame(this);
     stylePanel(navigationBottomCard_, 18, 238);
@@ -606,6 +534,7 @@ void NavigationPage::buildUi()
     arrivalBatteryLabel_ = new QLabel(navigationBottomCard_);
     for (QLabel* label : {remainingDistanceLabel_, remainingEtaLabel_, arrivalBatteryLabel_}) {
         setLabelStyle(label, 18, theme::textPrimary(), true, Qt::AlignCenter);
+        label->setTextFormat(Qt::RichText);
     }
     stopNavigationButton_ = new QPushButton(QStringLiteral("结束导航"), navigationBottomCard_);
     stopNavigationButton_->setCursor(Qt::PointingHandCursor);
@@ -698,35 +627,39 @@ void NavigationPage::layoutUi()
     shareButton_->setGeometry(X(419), Y(13), X(38), Y(38));
     pageTitle_->setGeometry(X(92), Y(13), X(287), Y(36));
 
-    routeSummaryCard_->setGeometry(X(15), Y(84), width() - X(30), Y(94));
-    originLabel_->setGeometry(X(47), Y(95), width() - X(120), Y(28));
-    destinationLabel_->setGeometry(X(47), Y(135), width() - X(120), Y(28));
-    routeSummaryMetaLabel_->setGeometry(width() - X(145), Y(107), X(65), Y(23));
-    swapRouteButton_->setGeometry(routeSummaryCard_->width() - X(48), Y(19), X(34), Y(54));
-
-    const int modeWidth = (width() - X(30)) / 3;
-    for (int index = 0; index < modeButtons_.size(); ++index) {
-        modeButtons_[index]->setGeometry(X(15) + index * modeWidth, Y(187),
-                                         index == 2 ? width() - X(15) - (X(15) + index * modeWidth)
-                                                    : modeWidth,
-                                         Y(42));
-    }
+    routeSummaryCard_->setGeometry(X(15), Y(84), width() - X(30), Y(112));
+    originCaptionLabel_->setGeometry(X(12), Y(12), X(60), Y(34));
+    destinationCaptionLabel_->setGeometry(X(12), Y(58), X(60), Y(34));
+    const int inputLeft = X(78);
+    const int inputWidth = routeSummaryCard_->width() - inputLeft - X(56);
+    originEdit_->setGeometry(inputLeft, Y(12), inputWidth, Y(34));
+    destinationEdit_->setGeometry(inputLeft, Y(58), inputWidth, Y(34));
+    routeSummaryMetaLabel_->setGeometry(0, 0, 0, 0);
+    swapRouteButton_->setGeometry(routeSummaryCard_->width() - X(48), Y(29), X(34), Y(54));
 
     mapFrame_->setGeometry(state_ == Navigating ? 0 : X(15),
-                           state_ == Navigating ? Y(248) : Y(239),
+                           state_ == Navigating ? Y(160) : Y(207),
                            state_ == Navigating ? width() : width() - X(30),
-                           state_ == Navigating ? Y(407) : Y(319));
+                           state_ == Navigating ? Y(475) : Y(328));
     const QRect mapContent = mapFrame_->rect().adjusted(1, 1, -1, -1);
     mapView_->setGeometry(mapContent);
     mapStateLabel_->setGeometry(X(24), mapFrame_->height() / 2 - Y(25),
                                 mapFrame_->width() - X(48), Y(50));
-    const int toolRight = mapFrame_->width() - X(53);
-    recenterButton_->setGeometry(toolRight, mapFrame_->height() - Y(56), X(42), Y(42));
-    zoomInButton_->setGeometry(toolRight, mapFrame_->height() - Y(154), X(42), Y(42));
-    zoomOutButton_->setGeometry(toolRight, mapFrame_->height() - Y(106), X(42), Y(42));
-    layersButton_->setGeometry(toolRight, mapFrame_->height() - Y(56), X(42), Y(42));
+    const int toolRight = mapFrame_->width() - X(58);
+    const int toolWidth = X(42);
+    const int toolHeight = Y(42);
+    const int toolGap = Y(8);
+    const int firstToolY = qMax(Y(8), mapFrame_->height()
+        - toolHeight * 4 - toolGap * 3 - Y(12));
+    recenterButton_->setGeometry(toolRight, firstToolY, toolWidth, toolHeight);
+    zoomInButton_->setGeometry(toolRight, firstToolY + toolHeight + toolGap,
+                                toolWidth, toolHeight);
+    zoomOutButton_->setGeometry(toolRight, firstToolY + (toolHeight + toolGap) * 2,
+                                toolWidth, toolHeight);
+    layersButton_->setGeometry(toolRight, firstToolY + (toolHeight + toolGap) * 3,
+                               toolWidth, toolHeight);
 
-    routeOptionsCard_->setGeometry(X(15), Y(568), width() - X(30), Y(164));
+    routeOptionsCard_->setGeometry(X(15), Y(545), width() - X(30), Y(164));
     routeOptionsHintLabel_->setGeometry(X(18), Y(9), X(150), Y(22));
     const int optionWidth = (routeOptionsCard_->width() - X(30)) / 3;
     for (int index = 0; index < routeOptionButtons_.size(); ++index) {
@@ -738,28 +671,22 @@ void NavigationPage::layoutUi()
         routeOptionMetaLabels_[index]->setGeometry(X(10), Y(49), actualWidth - X(20), Y(25));
     }
 
-    returnStationButton_->setGeometry(X(20), Y(748), X(145), Y(55));
-    startNavigationButton_->setGeometry(X(176), Y(748), width() - X(196), Y(55));
-    planningHintLabel_->setGeometry(X(24), Y(808), width() - X(48), Y(23));
+    returnStationButton_->setGeometry(X(20), Y(724), X(145), Y(55));
+    startNavigationButton_->setGeometry(X(176), Y(724), width() - X(196), Y(55));
+    planningHintLabel_->setGeometry(X(24), Y(790), width() - X(48), Y(23));
 
-    guidanceCard_->setGeometry(X(15), Y(74), width() - X(30), Y(184));
-    turnArrowWidget_->setGeometry(X(25), Y(22), X(62), Y(63));
-    guidanceDistanceLabel_->setGeometry(X(96), Y(17), X(255), Y(39));
-    guidanceTurnLabel_->setGeometry(X(96), Y(53), X(255), Y(25));
-    guidanceRoadLabel_->setGeometry(X(96), Y(53), X(255), Y(30));
-    muteButton_->setGeometry(guidanceCard_->width() - X(76), Y(17), X(56), Y(56));
-    laneGuideWidget_->setGeometry(X(20), Y(111), guidanceCard_->width() - X(40), Y(38));
-    guidanceTimeLabel_->setGeometry(X(21), Y(151), X(125), Y(27));
-    guidanceDistanceMetaLabel_->setGeometry(X(157), Y(151), X(125), Y(27));
-    guidanceEtaLabel_->setGeometry(X(294), Y(151), X(125), Y(27));
+    guidanceCard_->setGeometry(X(15), Y(45), width() - X(30), Y(110));
+    turnArrowWidget_->setGeometry(X(25), Y(18), X(62), Y(68));
+    guidanceDistanceLabel_->setGeometry(X(96), Y(15), width() - X(116), Y(40));
+    guidanceRoadLabel_->setGeometry(X(96), Y(52), width() - X(116), Y(43));
 
-    navigationBottomCard_->setGeometry(X(15), Y(662), width() - X(30), Y(154));
-    remainingDistanceLabel_->setGeometry(X(8), Y(16), navigationBottomCard_->width() / 3 - X(8), Y(34));
-    remainingEtaLabel_->setGeometry(navigationBottomCard_->width() / 3, Y(16),
-                                    navigationBottomCard_->width() / 3, Y(34));
-    arrivalBatteryLabel_->setGeometry(navigationBottomCard_->width() * 2 / 3, Y(16),
-                                      navigationBottomCard_->width() / 3 - X(8), Y(34));
-    stopNavigationButton_->setGeometry(X(15), Y(83), navigationBottomCard_->width() - X(30), Y(49));
+    navigationBottomCard_->setGeometry(X(15), Y(640), width() - X(30), Y(154));
+    remainingDistanceLabel_->setGeometry(X(8), Y(12), navigationBottomCard_->width() / 3 - X(8), Y(74));
+    remainingEtaLabel_->setGeometry(navigationBottomCard_->width() / 3, Y(12),
+                                    navigationBottomCard_->width() / 3, Y(74));
+    arrivalBatteryLabel_->setGeometry(navigationBottomCard_->width() * 2 / 3, Y(12),
+                                      navigationBottomCard_->width() / 3 - X(8), Y(74));
+    stopNavigationButton_->setGeometry(X(15), Y(100), navigationBottomCard_->width() - X(30), Y(49));
 
     finishedCard_->setGeometry(X(15), Y(84), width() - X(30), Y(376));
     finishedStatusIcon_->setGeometry(X(18), Y(24), X(31), Y(31));
@@ -795,25 +722,30 @@ void NavigationPage::openRoute(double destinationLatitude,
                                const QString& destinationName,
                                bool walking)
 {
+    Q_UNUSED(walking);
     navigationTimer_->stop();
+    const Session& session = Session::instance();
+    originLatitude_ = session.hasLocation() ? session.latitude() : 0.0;
+    originLongitude_ = session.hasLocation() ? session.longitude() : 0.0;
+    originName_ = currentLocationLabel();
     destinationLatitude_ = destinationLatitude;
     destinationLongitude_ = destinationLongitude;
     destinationName_ = destinationName;
-    walking_ = walking;
-    muted_ = false;
+    originEdit_->setText(originName_);
+    destinationEdit_->setText(destinationName_);
     selectedRouteOption_ = 0;
     navigationStartedAtMs_ = 0;
     simulatedElapsedSeconds_ = 0;
+    activeStepIndex_ = 0;
+    navigationProgress_ = 0.0;
+    currentPosition_ = QPointF();
+    positionDriven_ = false;
+    geocodingField_ = LocationField::None;
     route_ = RouteResult{};
     state_ = Planning;
     routeLoading_ = true;
     renderState();
     requestRoute();
-}
-
-bool NavigationPage::previewMode() const
-{
-    return previewMode_;
 }
 
 QString NavigationPage::currentLocationLabel() const
@@ -822,63 +754,145 @@ QString NavigationPage::currentLocationLabel() const
     return label.isEmpty() ? QStringLiteral("当前位置") : label;
 }
 
-void NavigationPage::requestRoute()
+void NavigationPage::onOriginReturnPressed()
 {
-    if (!Session::instance().hasLocation()) {
-        Session::instance().setLocation(41.7087, 123.4312,
-                                        QStringLiteral("沈阳市和平区三好街"));
-    }
-    if (previewMode_) {
-        onRouteReady(makePreviewRoute());
-        return;
-    }
-    routePlanner_->plan(Session::instance().latitude(), Session::instance().longitude(),
-                        destinationLatitude_, destinationLongitude_, walking_);
+    resolveLocation(true);
 }
 
-RouteResult NavigationPage::makePreviewRoute() const
+void NavigationPage::onDestinationReturnPressed()
 {
-    const double originLat = Session::instance().hasLocation()
-        ? Session::instance().latitude() : 41.7087;
-    const double originLng = Session::instance().hasLocation()
-        ? Session::instance().longitude() : 123.4312;
-    const QPointF origin(originLng, originLat);
-    const QPointF destination(destinationLongitude_, destinationLatitude_);
-    const double dx = destination.x() - origin.x();
-    const double dy = destination.y() - origin.y();
-    const double lngBend = qAbs(dx) < 0.001 ? 0.003 : dx * 0.14;
-    const double latBend = qAbs(dy) < 0.001 ? 0.002 : dy * 0.16;
+    resolveLocation(false);
+}
 
-    RouteResult result;
-    result.path = {
-        origin,
-        QPointF(origin.x() + dx * .08 + lngBend, origin.y() + dy * .08),
-        QPointF(origin.x() + dx * .23 + lngBend, origin.y() + dy * .21 + latBend),
-        QPointF(origin.x() + dx * .38, origin.y() + dy * .38 + latBend),
-        QPointF(origin.x() + dx * .57 - lngBend * .5, origin.y() + dy * .55),
-        QPointF(origin.x() + dx * .73, origin.y() + dy * .72 - latBend * .5),
-        QPointF(destination.x() - dx * .10, destination.y() - dy * .08),
-        destination,
-    };
-    auto distanceBetween = [](const QPointF& left, const QPointF& right) {
-        constexpr double earthRadiusKm = 6371.0;
-        const double lat1 = qDegreesToRadians(left.y());
-        const double lat2 = qDegreesToRadians(right.y());
-        const double dLat = qDegreesToRadians(right.y() - left.y());
-        const double dLng = qDegreesToRadians(right.x() - left.x());
-        const double a = std::sin(dLat / 2.0) * std::sin(dLat / 2.0) +
-                         std::cos(lat1) * std::cos(lat2) *
-                         std::sin(dLng / 2.0) * std::sin(dLng / 2.0);
-        return earthRadiusKm * 2.0 * std::atan2(std::sqrt(a), std::sqrt(1.0 - a)) * 1000.0;
-    };
-    for (int index = 1; index < result.path.size(); ++index) {
-        result.distanceMeters += distanceBetween(result.path.at(index - 1), result.path.at(index));
+void NavigationPage::resolveLocation(bool originField)
+{
+    QLineEdit* const edit = originField ? originEdit_ : destinationEdit_;
+    const QString address = edit->text().trimmed();
+    if (address.isEmpty()) {
+        planningHintLabel_->setStyleSheet(QStringLiteral(
+            "color: %1; background: transparent;").arg(cssColor(theme::danger())));
+        planningHintLabel_->setText(originField
+            ? QStringLiteral("请输入起点地址后按回车。")
+            : QStringLiteral("请输入充电站地址后按回车。"));
+        return;
     }
-    result.durationSeconds = qMax<qint64>(480, qRound64(result.distanceMeters / 2.5));
-    result.firstInstruction = QStringLiteral("右转进入三好街");
-    result.firstRoadName = QStringLiteral("三好街");
-    result.firstStepDistanceMeters = 300.0;
-    return result;
+
+    if (geocoder_->isBusy()) {
+        planningHintLabel_->setText(QStringLiteral("正在解析地址，请稍候…"));
+        return;
+    }
+
+    const bool alreadyResolved = originField
+        ? Session::instance().hasLocation() && address == currentLocationLabel()
+        : destinationLatitude_ != 0.0 && destinationLongitude_ != 0.0
+            && address == destinationName_;
+    if (alreadyResolved) {
+        replanFromCurrentInputs();
+        return;
+    }
+
+    geocodingField_ = originField ? LocationField::Origin : LocationField::Destination;
+    routeLoading_ = true;
+    route_ = RouteResult{};
+    state_ = Planning;
+    renderState();
+    planningHintLabel_->setText(QStringLiteral("正在解析地址并刷新路线…"));
+    geocoder_->geocode(address);
+}
+
+void NavigationPage::onGeocoded(double latitude, double longitude,
+                                const QString& formattedAddress)
+{
+    const LocationField field = geocodingField_;
+    geocodingField_ = LocationField::None;
+    const QString displayAddress = formattedAddress.trimmed().isEmpty()
+        ? (field == LocationField::Origin ? originEdit_->text().trimmed()
+                                          : destinationEdit_->text().trimmed())
+        : formattedAddress.trimmed();
+
+    if (field == LocationField::Origin) {
+        originLatitude_ = latitude;
+        originLongitude_ = longitude;
+        originName_ = displayAddress;
+        originEdit_->setText(displayAddress);
+    } else if (field == LocationField::Destination) {
+        destinationLatitude_ = latitude;
+        destinationLongitude_ = longitude;
+        destinationName_ = displayAddress;
+        destinationEdit_->setText(displayAddress);
+    } else {
+        return;
+    }
+    replanFromCurrentInputs();
+}
+
+void NavigationPage::onGeocoderError(const QString& message)
+{
+    geocodingField_ = LocationField::None;
+    routeLoading_ = false;
+    state_ = Planning;
+    renderState();
+    planningHintLabel_->setStyleSheet(QStringLiteral(
+        "color: %1; background: transparent;").arg(cssColor(theme::danger())));
+    planningHintLabel_->setText(message);
+}
+
+void NavigationPage::replanFromCurrentInputs()
+{
+    navigationTimer_->stop();
+    activeStepIndex_ = 0;
+    navigationProgress_ = 0.0;
+    currentPosition_ = QPointF();
+    positionDriven_ = false;
+    route_ = RouteResult{};
+    routeLoading_ = true;
+    state_ = Planning;
+    renderState();
+    requestRoute();
+}
+
+void NavigationPage::onSwapLocationsClicked()
+{
+    if (geocoder_->isBusy() || routeLoading_) {
+        planningHintLabel_->setText(QStringLiteral("当前正在更新路线，请稍候…"));
+        return;
+    }
+    if (!Session::instance().hasLocation() ||
+        (destinationLatitude_ == 0.0 && destinationLongitude_ == 0.0)) {
+        planningHintLabel_->setText(QStringLiteral("起点或充电站坐标尚未准备好。"));
+        return;
+    }
+
+    const double oldOriginLatitude = originLatitude_;
+    const double oldOriginLongitude = originLongitude_;
+    const QString oldOriginText = originEdit_->text().trimmed();
+    const QString oldDestinationText = destinationEdit_->text().trimmed();
+    const double oldDestinationLatitude = destinationLatitude_;
+    const double oldDestinationLongitude = destinationLongitude_;
+
+    originLatitude_ = oldDestinationLatitude;
+    originLongitude_ = oldDestinationLongitude;
+    originName_ = oldDestinationText;
+    destinationLatitude_ = oldOriginLatitude;
+    destinationLongitude_ = oldOriginLongitude;
+    destinationName_ = oldOriginText;
+    originEdit_->setText(oldDestinationText);
+    destinationEdit_->setText(oldOriginText);
+    replanFromCurrentInputs();
+}
+
+void NavigationPage::requestRoute()
+{
+    if ((originLatitude_ == 0.0 && originLongitude_ == 0.0) ||
+        (destinationLatitude_ == 0.0 && destinationLongitude_ == 0.0)) {
+        onRouteError(QStringLiteral("请先在首页搜索并确认当前位置。"));
+        return;
+    }
+    if (routePlanner_->isBusy()) {
+        return;
+    }
+    routePlanner_->plan(originLatitude_, originLongitude_, destinationLatitude_,
+                        destinationLongitude_, false);
 }
 
 void NavigationPage::onRouteReady(const RouteResult& result)
@@ -888,6 +902,12 @@ void NavigationPage::onRouteReady(const RouteResult& result)
         return;
     }
     route_ = result;
+    activeStepIndex_ = 0;
+    navigationProgress_ = 0.0;
+    currentPosition_ = (originLatitude_ != 0.0 || originLongitude_ != 0.0)
+        ? QPointF(originLongitude_, originLatitude_)
+        : QPointF();
+    positionDriven_ = false;
     routeLoading_ = false;
     state_ = Planning;
     renderState();
@@ -933,10 +953,12 @@ void NavigationPage::setAllStateWidgetsVisible(bool planVisible,
     closeButton_->setVisible(navigationVisible);
     shareButton_->setVisible(planVisible || finishedVisible);
     routeSummaryCard_->setVisible(planVisible);
-    originLabel_->setVisible(planVisible);
-    destinationLabel_->setVisible(planVisible);
+    originCaptionLabel_->setVisible(planVisible);
+    destinationCaptionLabel_->setVisible(planVisible);
+    originEdit_->setVisible(planVisible);
+    destinationEdit_->setVisible(planVisible);
     routeSummaryMetaLabel_->setVisible(planVisible);
-    for (QPushButton* button : modeButtons_) button->setVisible(planVisible);
+    routeSummaryMetaLabel_->setVisible(false);
     routeOptionsCard_->setVisible(planVisible);
     returnStationButton_->setVisible(planVisible);
     startNavigationButton_->setVisible(planVisible);
@@ -953,8 +975,12 @@ void NavigationPage::setAllStateWidgetsVisible(bool planVisible,
 void NavigationPage::renderPlanning()
 {
     pageTitle_->setText(QStringLiteral("路线规划"));
-    originLabel_->setText(QStringLiteral("当前位置　%1").arg(currentLocationLabel()));
-    destinationLabel_->setText(QStringLiteral("充电站　%1").arg(destinationName_));
+    if (originEdit_->text().trimmed().isEmpty()) {
+        originEdit_->setText(originName_.isEmpty() ? currentLocationLabel() : originName_);
+    }
+    if (destinationEdit_->text().trimmed().isEmpty()) {
+        destinationEdit_->setText(destinationName_);
+    }
     routeSummaryMetaLabel_->setText(routeLoading_ ? QStringLiteral("规划中...")
                                                   : formatDistance(route_.distanceMeters));
     planningHintLabel_->setStyleSheet(QStringLiteral(
@@ -966,7 +992,6 @@ void NavigationPage::renderPlanning()
     startNavigationButton_->setText(routeLoading_ ? QStringLiteral("规划中...")
                                                    : QStringLiteral("开始导航"));
     returnStationButton_->setEnabled(!routeLoading_);
-    setPlanMode(walking_);
     updatePlanningMetrics();
     loadMap();
     if (!routeLoading_) {
@@ -978,28 +1003,6 @@ void NavigationPage::renderPlanning()
 void NavigationPage::renderNavigating()
 {
     pageTitle_->setText(QStringLiteral("导航中"));
-    const int distance = route_.firstStepDistanceMeters > 0.0
-        ? qRound(route_.firstStepDistanceMeters) : 300;
-    const QString road = route_.firstRoadName.isEmpty()
-        ? QStringLiteral("三好街") : route_.firstRoadName;
-    QString turn = route_.firstInstruction;
-    if (!turn.isEmpty() && !road.isEmpty()) {
-        const int roadIndex = turn.indexOf(road);
-        if (roadIndex >= 0) turn = turn.left(roadIndex).trimmed();
-    }
-    if (turn.isEmpty()) turn = QStringLiteral("右转进入");
-    guidanceDistanceLabel_->setText(QStringLiteral(
-        "前方 <b style='color:#4a9aff;font-size:31px;'>%1</b> 米　%2")
-        .arg(distance).arg(turn.toHtmlEscaped()));
-    guidanceDistanceLabel_->setTextFormat(Qt::RichText);
-    guidanceTurnLabel_->clear();
-    guidanceRoadLabel_->setText(road);
-    guidanceTimeLabel_->setText(QStringLiteral("%1\n剩余时间")
-        .arg(formatDuration(route_.durationSeconds)));
-    guidanceDistanceMetaLabel_->setText(QStringLiteral("%1\n剩余距离")
-        .arg(formatDistance(route_.distanceMeters)));
-    guidanceEtaLabel_->setText(QStringLiteral("%1\n预计到达")
-        .arg(formatEta(route_.durationSeconds)));
     updateNavigationReadout();
     loadMap();
 }
@@ -1020,8 +1023,12 @@ void NavigationPage::renderError(const QString& message)
 {
     Q_UNUSED(message);
     pageTitle_->setText(QStringLiteral("路线规划"));
-    originLabel_->setText(QStringLiteral("当前位置　%1").arg(currentLocationLabel()));
-    destinationLabel_->setText(QStringLiteral("充电站　%1").arg(destinationName_));
+    if (originEdit_->text().trimmed().isEmpty()) {
+        originEdit_->setText(originName_.isEmpty() ? currentLocationLabel() : originName_);
+    }
+    if (destinationEdit_->text().trimmed().isEmpty()) {
+        destinationEdit_->setText(destinationName_);
+    }
     routeSummaryMetaLabel_->setText(QStringLiteral("--"));
     startNavigationButton_->setEnabled(false);
     routeOptionsCard_->setVisible(false);
@@ -1030,12 +1037,21 @@ void NavigationPage::renderError(const QString& message)
 
 void NavigationPage::updatePlanningMetrics()
 {
-    const qint64 baseDuration = route_.durationSeconds > 0 ? route_.durationSeconds : 1080;
-    const double baseDistance = route_.distanceMeters > 0 ? route_.distanceMeters : 6800.0;
+    if (routeLoading_ || !route_.valid()) {
+        for (int index = 0; index < routeOptionButtons_.size(); ++index) {
+            routeOptionButtons_[index]->setText(index == 0
+                ? QStringLiteral("推荐")
+                : index == 1 ? QStringLiteral("最快") : QStringLiteral("少红绿灯"));
+            routeOptionTimeLabels_[index]->setText(QStringLiteral("--"));
+            routeOptionMetaLabels_[index]->setText(QStringLiteral("等待高德路线"));
+        }
+        routeOptionsHintLabel_->setText(QStringLiteral("推荐路线"));
+        return;
+    }
+
+    const qint64 baseDuration = route_.durationSeconds;
+    const double baseDistance = route_.distanceMeters;
     const QList<QString> tags = {QStringLiteral("推荐"), QStringLiteral("最快"), QStringLiteral("少红绿灯")};
-    const QList<QString> details = {QStringLiteral("路线畅通　| 8 个红绿灯"),
-                                    QStringLiteral("更快路线　| 12 个红绿灯"),
-                                    QStringLiteral("红绿灯少　| 5 个红绿灯")};
     for (int index = 0; index < 3; ++index) {
         const qint64 duration = qMax<qint64>(60, baseDuration + (index == 0 ? 0 : index == 1 ? -120 : 180));
         const double distance = qMax(100.0, baseDistance + (index == 0 ? 0.0 : index == 1 ? 400.0 : -300.0));
@@ -1065,27 +1081,170 @@ void NavigationPage::updateNavigationReadout()
     const qint64 elapsed = navigationStartedAtMs_ > 0
         ? qMax<qint64>(0, (QDateTime::currentMSecsSinceEpoch() - navigationStartedAtMs_) / 1000)
         : simulatedElapsedSeconds_;
-    simulatedElapsedSeconds_ = qMin(route_.durationSeconds, elapsed);
+    if (!positionDriven_) {
+        simulatedElapsedSeconds_ = qMin(route_.durationSeconds, elapsed);
+        navigationProgress_ = route_.durationSeconds > 0
+            ? qBound(0.0, static_cast<double>(simulatedElapsedSeconds_) /
+                              route_.durationSeconds, 0.99)
+            : 0.0;
+    }
     const qint64 remainingSeconds = qMax<qint64>(0, route_.durationSeconds - simulatedElapsedSeconds_);
-    const double progress = route_.durationSeconds > 0
-        ? qBound(0.0, static_cast<double>(simulatedElapsedSeconds_) / route_.durationSeconds, 0.99)
-        : 0.0;
+    const double progress = navigationProgress_;
     const double remainingDistance = route_.distanceMeters * (1.0 - progress);
 
-    guidanceTimeLabel_->setText(QStringLiteral("%1\n剩余时间")
-        .arg(formatDuration(remainingSeconds)));
-    guidanceDistanceMetaLabel_->setText(QStringLiteral("%1\n剩余距离")
-        .arg(formatDistance(remainingDistance)));
-    guidanceEtaLabel_->setText(QStringLiteral("%1\n预计到达")
-        .arg(formatEta(remainingSeconds)));
-    remainingDistanceLabel_->setText(QStringLiteral("剩余　%1\n剩余距离")
-        .arg(formatDistance(remainingDistance)));
-    remainingEtaLabel_->setText(QStringLiteral("到达　%1\n预计到达")
-        .arg(formatEta(remainingSeconds)));
-    arrivalBatteryLabel_->setText(QStringLiteral("电量　42%\n到达后剩余电量"));
+    remainingDistanceLabel_->setText(QStringLiteral(
+        "<span style='color:%1;font-size:13px;'>剩余距离</span><br>"
+        "<span style='font-size:25px;font-weight:700;'>%2</span>")
+        .arg(cssColor(theme::textSecondary()), formatDistance(remainingDistance)));
+    remainingEtaLabel_->setText(QStringLiteral(
+        "<span style='color:%1;font-size:13px;'>预计到达</span><br>"
+        "<span style='font-size:25px;font-weight:700;'>%2</span>")
+        .arg(cssColor(theme::textSecondary()), formatEta(remainingSeconds)));
+    arrivalBatteryLabel_->setText(QStringLiteral(
+        "<span style='color:%1;font-size:13px;'>到达后剩余电量</span><br>"
+        "<span style='color:%2;font-size:25px;font-weight:700;'>42%</span>")
+        .arg(cssColor(theme::textSecondary()), cssColor(theme::success())));
+    updateGuidanceForProgress(progress);
+    if (positionDriven_) {
+        runMapJavaScript(QStringLiteral(
+            "window.__navigationMap && window.__navigationMap.setUserPosition(%1,%2);")
+            .arg(currentPosition_.x(), 0, 'f', 7)
+            .arg(currentPosition_.y(), 0, 'f', 7));
+    } else {
+        runMapJavaScript(QStringLiteral(
+            "window.__navigationMap && window.__navigationMap.setProgress(%1);")
+            .arg(progress, 0, 'f', 5));
+    }
+}
+
+double NavigationPage::routeProgressForPosition(const QPointF& position) const
+{
+    if (route_.path.size() < 2) {
+        return 0.0;
+    }
+
+    const double earthScale = qCos(qDegreesToRadians(position.y()));
+    double totalLength = 0.0;
+    double closestLength = 0.0;
+    double closestDistance = std::numeric_limits<double>::max();
+    for (int index = 1; index < route_.path.size(); ++index) {
+        const QPointF& start = route_.path.at(index - 1);
+        const QPointF& end = route_.path.at(index);
+        const double dx = (end.x() - start.x()) * earthScale;
+        const double dy = end.y() - start.y();
+        const double segmentLength = std::hypot(dx, dy);
+        if (segmentLength < 1e-12) {
+            continue;
+        }
+
+        const double px = (position.x() - start.x()) * earthScale;
+        const double py = position.y() - start.y();
+        const double ratio = qBound(0.0, (px * dx + py * dy) /
+                                           (segmentLength * segmentLength), 1.0);
+        const double projectedX = start.x() + (end.x() - start.x()) * ratio;
+        const double projectedY = start.y() + (end.y() - start.y()) * ratio;
+        const double distanceX = (position.x() - projectedX) * earthScale;
+        const double distanceY = position.y() - projectedY;
+        const double distance = distanceX * distanceX + distanceY * distanceY;
+        if (distance < closestDistance) {
+            closestDistance = distance;
+            closestLength = totalLength + segmentLength * ratio;
+        }
+        totalLength += segmentLength;
+    }
+    return totalLength > 0.0 ? qBound(0.0, closestLength / totalLength, 1.0) : 0.0;
+}
+
+void NavigationPage::updateGuidanceForProgress(double progress, int preferredStep)
+{
+    if (!route_.valid()) {
+        return;
+    }
+    navigationProgress_ = qBound(0.0, progress, 1.0);
+    if (route_.steps.isEmpty()) {
+        const int distance = qRound(route_.distanceMeters * (1.0 - navigationProgress_));
+        guidanceDistanceLabel_->setText(QStringLiteral(
+            "前方 <b style='color:%1;font-size:31px;'>%2</b> 米　沿路线行驶")
+            .arg(cssColor(theme::primaryBlue())).arg(qMax(0, distance)));
+        guidanceRoadLabel_->setText(QStringLiteral("沿规划路线行驶"));
+        static_cast<TurnArrowWidget*>(turnArrowWidget_)->setInstruction(
+            QStringLiteral("直行"));
+        return;
+    }
+
+    const double travelled = route_.distanceMeters * navigationProgress_;
+    int stepIndex = preferredStep;
+    if (stepIndex < 0 || stepIndex >= route_.steps.size()) {
+        double stepStart = 0.0;
+        stepIndex = route_.steps.size() - 1;
+        for (int index = 0; index < route_.steps.size(); ++index) {
+            const double stepLength = qMax(0.0, route_.steps.at(index).distanceMeters);
+            if (travelled <= stepStart + stepLength || index == route_.steps.size() - 1) {
+                stepIndex = index;
+                break;
+            }
+            stepStart += stepLength;
+        }
+    }
+    activeStepIndex_ = stepIndex;
+
+    double stepStart = 0.0;
+    for (int index = 0; index < stepIndex; ++index) {
+        stepStart += qMax(0.0, route_.steps.at(index).distanceMeters);
+    }
+    const RouteStep& step = route_.steps.at(stepIndex);
+    const double stepLength = qMax(0.0, step.distanceMeters);
+    const int distanceAhead = navigationProgress_ >= 0.995
+        ? 0
+        : qRound(stepLength > 0.0
+                    ? qMax(0.0, stepStart + stepLength - travelled)
+                    : route_.distanceMeters * (1.0 - navigationProgress_));
+    const QString instruction = navigationProgress_ >= 0.995
+        ? QStringLiteral("已到达目的地")
+        : (step.instruction.trimmed().isEmpty()
+               ? QStringLiteral("沿路线行驶") : step.instruction.trimmed());
+    const QString road = navigationProgress_ >= 0.995
+        ? destinationName_
+        : (step.roadName.trimmed().isEmpty() ? instruction : step.roadName.trimmed());
+    QString maneuver = QStringLiteral("沿路线行驶");
+    const QStringList maneuverWords = {
+        QStringLiteral("左转"), QStringLiteral("右转"), QStringLiteral("掉头"),
+        QStringLiteral("直行"), QStringLiteral("靠左"), QStringLiteral("靠右"),
+        QStringLiteral("到达")
+    };
+    for (const QString& word : maneuverWords) {
+        if (instruction.contains(word)) {
+            maneuver = word;
+            break;
+        }
+    }
+
+    guidanceDistanceLabel_->setText(QStringLiteral(
+        "前方 <b style='color:%1;font-size:31px;'>%2</b> 米　%3")
+        .arg(cssColor(theme::primaryBlue()))
+        .arg(distanceAhead)
+        .arg(maneuver.toHtmlEscaped()));
+    const QString roadInstruction = road == instruction || road.isEmpty()
+        ? maneuver
+        : QStringLiteral("%1 · %2").arg(road, maneuver);
+    guidanceRoadLabel_->setText(roadInstruction);
+    static_cast<TurnArrowWidget*>(turnArrowWidget_)->setInstruction(maneuver);
+}
+
+void NavigationPage::updateUserPosition(double latitude, double longitude)
+{
+    if (state_ != Navigating || !route_.valid()) {
+        return;
+    }
+    currentPosition_ = QPointF(longitude, latitude);
+    positionDriven_ = true;
+    navigationProgress_ = routeProgressForPosition(currentPosition_);
+    simulatedElapsedSeconds_ = qRound64(
+        route_.durationSeconds * navigationProgress_);
+    updateNavigationReadout();
     runMapJavaScript(QStringLiteral(
-        "window.__navigationMap && window.__navigationMap.setProgress(%1);")
-        .arg(progress, 0, 'f', 5));
+        "window.__navigationMap && window.__navigationMap.setUserPosition(%1,%2);")
+        .arg(longitude, 0, 'f', 7).arg(latitude, 0, 'f', 7));
 }
 
 QString NavigationPage::formatDistance(double meters) const
@@ -1112,20 +1271,12 @@ QString NavigationPage::formatEta(qint64 secondsFromNow) const
     return time.toString(QStringLiteral("H:mm"));
 }
 
-void NavigationPage::setPlanMode(bool walking)
-{
-    if (modeButtons_.size() != 3) return;
-    static_cast<ModeButton*>(modeButtons_.at(0))->setSelected(!walking);
-    static_cast<ModeButton*>(modeButtons_.at(1))->setSelected(walking);
-    static_cast<ModeButton*>(modeButtons_.at(2))->setSelected(false);
-}
-
 void NavigationPage::setMapVisible(bool visible)
 {
     mapFrame_->setVisible(visible);
     recenterButton_->setVisible(visible);
-    zoomInButton_->setVisible(visible && state_ == Planning);
-    zoomOutButton_->setVisible(visible && state_ == Planning);
+    zoomInButton_->setVisible(visible);
+    zoomOutButton_->setVisible(visible);
     layersButton_->setVisible(visible);
 }
 
@@ -1146,11 +1297,10 @@ QString NavigationPage::buildNavigationMapDocument() const
     nameArray.append(destinationName_);
     const QString nameJson = QString::fromUtf8(
         QJsonDocument(nameArray).toJson(QJsonDocument::Compact));
-    const Session& session = Session::instance();
     document.replace(QStringLiteral("__ORIGIN_LNG__"),
-                     QString::number(session.longitude(), 'f', 7));
+                     QString::number(originLongitude_, 'f', 7));
     document.replace(QStringLiteral("__ORIGIN_LAT__"),
-                     QString::number(session.latitude(), 'f', 7));
+                     QString::number(originLatitude_, 'f', 7));
     document.replace(QStringLiteral("__DESTINATION_LNG__"),
                      QString::number(destinationLongitude_, 'f', 7));
     document.replace(QStringLiteral("__DESTINATION_LAT__"),
@@ -1184,7 +1334,7 @@ void NavigationPage::loadMap()
         mapStateLabel_->setVisible(true);
         mapStateLabel_->setText(hasJsKey
             ? QStringLiteral("地图预览需要在桌面窗口中打开")
-            : QStringLiteral("高德地图 key 未配置，暂时无法显示路线地图"));
+            : QStringLiteral("高德地图 key 未配置，无法显示路线地图"));
         return;
     }
     const QString document = buildNavigationMapDocument();
@@ -1228,24 +1378,6 @@ void NavigationPage::onShareClicked()
     planningHintLabel_->setText(QStringLiteral("路线信息已复制，可分享给好友"));
 }
 
-void NavigationPage::onModeClicked()
-{
-    auto* button = static_cast<ModeButton*>(sender());
-    const int index = modeButtons_.indexOf(button);
-    if (index < 0) return;
-    if (index == 2) {
-        planningHintLabel_->setText(QStringLiteral("骑行路线即将上线，当前使用驾车路线"));
-        return;
-    }
-    const bool walking = index == 1;
-    if (walking_ == walking && !routeLoading_) return;
-    walking_ = walking;
-    routeLoading_ = true;
-    route_ = RouteResult{};
-    renderState();
-    requestRoute();
-}
-
 void NavigationPage::onRouteOptionClicked()
 {
     auto* button = qobject_cast<QPushButton*>(sender());
@@ -1261,6 +1393,12 @@ void NavigationPage::onStartNavigationClicked()
     state_ = Navigating;
     navigationStartedAtMs_ = QDateTime::currentMSecsSinceEpoch();
     simulatedElapsedSeconds_ = 0;
+    activeStepIndex_ = 0;
+    navigationProgress_ = 0.0;
+    positionDriven_ = false;
+    currentPosition_ = (originLatitude_ != 0.0 || originLongitude_ != 0.0)
+        ? QPointF(originLongitude_, originLatitude_)
+        : QPointF();
     navigationTimer_->start();
     renderState();
 }
@@ -1295,7 +1433,11 @@ void NavigationPage::onZoomOutClicked()
 
 void NavigationPage::onLayersClicked()
 {
-    planningHintLabel_->setText(QStringLiteral("地图图层已切换"));
+    runMapJavaScript(QStringLiteral(
+        "window.__navigationMap && window.__navigationMap.fit();"));
+    if (planningHintLabel_->isVisible()) {
+        planningHintLabel_->setText(QStringLiteral("已全览整条路线"));
+    }
 }
 
 void NavigationPage::onNavigationTick()

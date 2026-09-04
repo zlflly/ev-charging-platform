@@ -1,14 +1,15 @@
 #include "ui/StationDetailPage.h"
 
+#include "config/AppConfig.h"
 #include "net/NetworkClient.h"
 #include "protocol/Protocol.h"
 #include "session/Session.h"
 #include "ui/ChargerCard.h"
+#include "ui/SvgIcon.h"
 #include "ui/theme/Theme.h"
 
 #include <QFrame>
 #include <QHBoxLayout>
-#include <QIcon>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QLabel>
@@ -39,14 +40,7 @@ QString cssRgba(const QColor& color, int alpha)
 QPixmap tintedSvgPixmap(const QString& resourcePath, const QSize& size,
                         const QColor& color)
 {
-    const QPixmap source = QIcon(resourcePath).pixmap(size);
-    if (source.isNull()) return {};
-    QPixmap tinted(size);
-    tinted.fill(color);
-    QPainter painter(&tinted);
-    painter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
-    painter.drawPixmap(0, 0, source);
-    return tinted;
+    return svg::tintedPixmap(resourcePath, size, color);
 }
 
 QPainterPath starPath(const QPointF& center, qreal outerRadius, qreal innerRadius)
@@ -320,10 +314,11 @@ private:
 StationDetail makePreviewDetail()
 {
     StationDetail detail;
-    detail.station = {1, QStringLiteral("东软软件园充电站"), 1.25, 20, 8, 1.2};
-    detail.address = QStringLiteral("辽宁省沈阳市浑南区新秀街2号东软软件园");
-    detail.latitude = 41.7195;
-    detail.longitude = 123.4312;
+    detail.station = {1, QString::fromUtf8(appConfig::kPreviewStationName),
+                      1.20, 4, 2, 0.0};
+    detail.address = QStringLiteral("北京市房山区良乡高教园区模拟道路 2001 号");
+    detail.latitude = appConfig::kPreviewStationLatitude;
+    detail.longitude = appConfig::kPreviewStationLongitude;
 
     for (int index = 0; index < 20; ++index) {
         ChargerInfo charger;
@@ -613,7 +608,10 @@ void StationDetailPage::openStation(qint64 stationId)
 
     if (previewMode_) {
         Session::instance().setLocation(
-            41.7087, 123.4312, QStringLiteral("预览定位"));
+            appConfig::kDefaultLocationLatitude,
+            appConfig::kDefaultLocationLongitude,
+            QStringLiteral("%1（预览定位）")
+                .arg(QString::fromUtf8(appConfig::kDefaultLocationLabel)));
         renderDetail(previewDetail());
         return;
     }

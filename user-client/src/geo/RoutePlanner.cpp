@@ -5,6 +5,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonValue>
 #include <QNetworkAccessManager>
 #include <QNetworkProxy>
 #include <QNetworkReply>
@@ -55,6 +56,22 @@ bool appendPolyline(const QString& encoded, QList<QPointF>* output)
         appended = true;
     }
     return appended;
+}
+
+double jsonNumber(const QJsonValue& value)
+{
+    if (value.isDouble()) {
+        return value.toDouble();
+    }
+    return value.toString().toDouble();
+}
+
+qint64 jsonInteger(const QJsonValue& value)
+{
+    if (value.isDouble()) {
+        return static_cast<qint64>(value.toDouble());
+    }
+    return value.toString().toLongLong();
 }
 
 } // namespace
@@ -156,18 +173,29 @@ void RoutePlanner::onReplyFinished()
 
     const QJsonObject path = paths.first().toObject();
     RouteResult result;
-    result.distanceMeters = path.value(QStringLiteral("distance")).toDouble();
-    result.durationSeconds = static_cast<qint64>(
-        path.value(QStringLiteral("duration")).toDouble());
+    result.distanceMeters = jsonNumber(path.value(QStringLiteral("distance")));
+    result.durationSeconds = jsonInteger(path.value(QStringLiteral("duration")));
     const QJsonArray steps = path.value(QStringLiteral("steps")).toArray();
     for (int index = 0; index < steps.size(); ++index) {
         const QJsonObject step = steps.at(index).toObject();
+        RouteStep routeStep;
+        routeStep.instruction = step.value(QStringLiteral("instruction")).toString();
+        routeStep.roadName = step.value(QStringLiteral("road")).toString();
+        routeStep.distanceMeters = jsonNumber(step.value(QStringLiteral("distance")));
+        routeStep.durationSeconds = jsonInteger(step.value(QStringLiteral("duration")));
+        appendPolyline(step.value(QStringLiteral("polyline")).toString(),
+                       &routeStep.path);
+        result.steps.append(routeStep);
         if (index == 0) {
-            result.firstInstruction = step.value(QStringLiteral("instruction")).toString();
-            result.firstRoadName = step.value(QStringLiteral("road")).toString();
-            result.firstStepDistanceMeters = step.value(QStringLiteral("distance")).toDouble();
+            result.firstInstruction = routeStep.instruction;
+            result.firstRoadName = routeStep.roadName;
+            result.firstStepDistanceMeters = routeStep.distanceMeters;
         }
-        appendPolyline(step.value(QStringLiteral("polyline")).toString(), &result.path);
+        for (const QPointF& point : routeStep.path) {
+            if (result.path.isEmpty() || result.path.last() != point) {
+                result.path.append(point);
+            }
+        }
     }
 
     if (!result.valid()) {

@@ -2,12 +2,12 @@
 
 #include "net/NetworkClient.h"
 #include "protocol/Protocol.h"
+#include "ui/SvgIcon.h"
 #include "ui/theme/Theme.h"
 
 #include <QDateTime>
 #include <QFrame>
 #include <QHBoxLayout>
-#include <QIcon>
 #include <QJsonArray>
 #include <QLabel>
 #include <QLineEdit>
@@ -35,14 +35,7 @@ QString cssRgba(const QColor& color, int alpha)
 QPixmap tintedSvgPixmap(const QString& resourcePath, const QSize& size,
                         const QColor& color)
 {
-    const QPixmap source = QIcon(resourcePath).pixmap(size);
-    if (source.isNull()) return {};
-    QPixmap tinted(size);
-    tinted.fill(color);
-    QPainter painter(&tinted);
-    painter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
-    painter.drawPixmap(0, 0, source);
-    return tinted;
+    return svg::tintedPixmap(resourcePath, size, color);
 }
 
 class BackButton final : public QPushButton

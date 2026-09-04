@@ -8,6 +8,16 @@
 class QNetworkAccessManager;
 class QNetworkReply;
 
+// 高德 direction API 返回的道路级导航步骤。
+struct RouteStep
+{
+    QString instruction;
+    QString roadName;
+    double distanceMeters = 0.0;
+    qint64 durationSeconds = 0;
+    QList<QPointF> path;
+};
+
 // 高德路线规划结果。QPointF 的 x 为经度，y 为纬度，方便直接喂给地图页面。
 struct RouteResult
 {
@@ -17,6 +27,7 @@ struct RouteResult
     QString firstInstruction;
     QString firstRoadName;
     double firstStepDistanceMeters = 0.0;
+    QList<RouteStep> steps;
 
     bool valid() const { return distanceMeters > 0.0 && !path.isEmpty(); }
 };

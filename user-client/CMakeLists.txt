@@ -6,7 +6,16 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Network Widgets WebEngineWidgets)
+# The development container keeps the extra Qt SVG module in the D: drive.
+# Prefer it when present, while still allowing normal system Qt installations
+# to satisfy the dependency elsewhere.
+set(_local_qt6svg_dir
+    "${CMAKE_CURRENT_SOURCE_DIR}/../.deps/qt6svg/sysroot/usr/lib/x86_64-linux-gnu/cmake/Qt6Svg")
+if(EXISTS "${_local_qt6svg_dir}/Qt6SvgConfig.cmake" AND NOT DEFINED Qt6Svg_DIR)
+    set(Qt6Svg_DIR "${_local_qt6svg_dir}" CACHE PATH "Qt 6 SVG package directory")
+endif()
+
+find_package(Qt6 REQUIRED COMPONENTS Core Network Widgets Svg WebEngineWidgets)
 
 qt_standard_project_setup()
 
@@ -27,6 +36,7 @@ qt_add_executable(user-client
     src/ui/SettlementPage.cpp
     src/ui/NavigationPage.cpp
     src/ui/ProfilePage.cpp
+    src/ui/SvgIcon.h
     src/ui/OrderPage.cpp
     src/config/AppConfig.h
     src/model/Station.h
@@ -83,5 +93,6 @@ target_link_libraries(user-client PRIVATE
     Qt6::Core
     Qt6::Network
     Qt6::Widgets
+    Qt6::Svg
     Qt6::WebEngineWidgets
 )

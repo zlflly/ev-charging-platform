@@ -175,10 +175,15 @@ int main(int argc, char* argv[])
         || !qgetenv("EV_NAVIGATION_SCREENSHOT_PATH").isEmpty();
 
     if (navigationPreview) {
-        Session::instance().setLocation(41.7087, 123.4312,
-                                        QStringLiteral("沈阳市和平区三好街"));
-        navigationPage.openRoute(41.7195, 123.4312,
-                                 QStringLiteral("东软软件园充电站"), false);
+        Session::instance().setLocation(
+            appConfig::kDefaultLocationLatitude,
+            appConfig::kDefaultLocationLongitude,
+            QStringLiteral("%1（默认定位）")
+                .arg(QString::fromUtf8(appConfig::kDefaultLocationLabel)));
+        navigationPage.openRoute(
+            appConfig::kPreviewStationLatitude,
+            appConfig::kPreviewStationLongitude,
+            QString::fromUtf8(appConfig::kPreviewStationName), false);
         showPage(&navigationPage, theme::loginCanvasHeight);
     } else if (settlementPreview) {
         OrderInfo order;

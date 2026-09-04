@@ -6,12 +6,12 @@
 #include "protocol/Protocol.h"
 #include "session/Session.h"
 #include "ui/StationCard.h"
+#include "ui/SvgIcon.h"
 #include "ui/theme/Theme.h"
 
 #include <QFile>
 #include <QFrame>
 #include <QHBoxLayout>
-#include <QIcon>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPainter>
@@ -30,10 +30,6 @@
 namespace {
 
 // 与 WSL 版本保持一致的默认定位，只在首次进入主页且没有已有定位时使用。
-constexpr double kDefaultLatitude = 39.735678;
-constexpr double kDefaultLongitude = 116.171271;
-constexpr const char* kDefaultLocationLabel = "北京理工大学良乡校区";
-
 QString cssColor(const QColor& color)
 {
     return color.name(QColor::HexRgb);
@@ -48,14 +44,7 @@ QString cssRgba(const QColor& color, int alpha)
 QPixmap tintedSvgPixmap(const QString& resourcePath, const QSize& size,
                         const QColor& color)
 {
-    const QPixmap source = QIcon(resourcePath).pixmap(size);
-    if (source.isNull()) return {};
-    QPixmap tinted(size);
-    tinted.fill(color);
-    QPainter painter(&tinted);
-    painter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
-    painter.drawPixmap(0, 0, source);
-    return tinted;
+    return svg::tintedPixmap(resourcePath, size, color);
 }
 
 QString readEnvironmentValue(const char* variableName)
@@ -176,10 +165,10 @@ private:
 QList<StationInfo> previewStations()
 {
     return {
-        {1, QStringLiteral("东软软件园充电站"), 1.25, 20, 8, 1.2},
-        {2, QStringLiteral("长白岛万科广场充电站"), 1.35, 16, 5, 2.1},
-        {3, QStringLiteral("深南商业中心充电站"), 1.28, 30, 12, 3.4},
-        {4, QStringLiteral("沈阳奥体中心充电站"), 1.30, 24, 9, 4.6},
+        {2001, QStringLiteral("北理良乡南门充电站"), 1.20, 4, 2, 0.2},
+        {2002, QStringLiteral("良乡大学城快充站"), 1.50, 4, 2, 0.4},
+        {2003, QStringLiteral("房山长阳智慧充电站"), 1.80, 4, 0, 2.6},
+        {2004, QStringLiteral("良乡东路超级充电站"), 1.35, 4, 3, 0.8},
     };
 }
 
@@ -402,8 +391,10 @@ void HomePage::showEvent(QShowEvent* event)
     if (previewMode_) {
         // 视觉预览不请求站点接口，但仍让配置了高德 key 的环境显示真实地图。
         Session::instance().setLocation(
-            kDefaultLatitude, kDefaultLongitude,
-            QStringLiteral("%1（预览定位）").arg(QString::fromUtf8(kDefaultLocationLabel)));
+            appConfig::kDefaultLocationLatitude,
+            appConfig::kDefaultLocationLongitude,
+            QStringLiteral("%1（预览定位）")
+                .arg(QString::fromUtf8(appConfig::kDefaultLocationLabel)));
         refreshMap();
         stations_ = previewStations();
         applySort(sortMode_);
@@ -456,8 +447,10 @@ void HomePage::onGeocodeError(const QString& message)
 void HomePage::applyDefaultLocation()
 {
     Session::instance().setLocation(
-        kDefaultLatitude, kDefaultLongitude,
-        QStringLiteral("%1（默认定位）").arg(QString::fromUtf8(kDefaultLocationLabel)));
+        appConfig::kDefaultLocationLatitude,
+        appConfig::kDefaultLocationLongitude,
+        QStringLiteral("%1（默认定位）")
+            .arg(QString::fromUtf8(appConfig::kDefaultLocationLabel)));
     refreshStations();
 }
 

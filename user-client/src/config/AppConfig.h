@@ -5,6 +5,14 @@
 // 本地运行配置：密钥只从进程环境或 user-client/local.env 读取，源码不保存密钥。
 namespace appConfig {
 
+// 与 mock server 的初始站点数据保持一致；主页、站点预览和导航预览共用这组坐标。
+inline constexpr double kDefaultLocationLatitude = 39.735678;
+inline constexpr double kDefaultLocationLongitude = 116.171271;
+inline constexpr const char* kDefaultLocationLabel = "北京理工大学良乡校区";
+inline constexpr double kPreviewStationLatitude = 39.7328;
+inline constexpr double kPreviewStationLongitude = 116.1735;
+inline constexpr const char* kPreviewStationName = "北理良乡南门充电站";
+
 inline constexpr const char* kAmapWebServiceKeyEnvironment = "AMAP_WEB_SERVICE_KEY";
 inline constexpr const char* kAmapGeocoderUrl = "https://restapi.amap.com/v3/geocode/geo";
 inline constexpr const char* kAmapDrivingUrl = "https://restapi.amap.com/v3/direction/driving";

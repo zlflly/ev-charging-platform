@@ -3,17 +3,20 @@
 #include "geo/RoutePlanner.h"
 
 #include <QList>
+#include <QPointF>
 #include <QWidget>
 
 class QFrame;
 class QLabel;
+class QLineEdit;
 class QPushButton;
 class QTimer;
 class QWebEngineView;
 class NetworkClient;
+class Geocoder;
 
 // 移动端导航流程：路线规划 -> 导航中 -> 导航结束。
-// 地图与路线数据来自高德；预览模式只提供可操作的本地路线样例。
+// 地图与路线数据来自高德；未配置 key 时明确提示，不伪造路线。
 class NavigationPage : public QWidget
 {
     Q_OBJECT
@@ -26,6 +29,10 @@ public:
                    const QString& destinationName,
                    bool walking = false);
 
+    // 由定位/模拟器推送当前位置后，页面会同步高亮当前道路级步骤、更新顶部指引
+    // 和高德地图上的当前位置标记。坐标顺序为纬度、经度。
+    void updateUserPosition(double latitude, double longitude);
+
 signals:
     void backRequested();
     void backToStationRequested();
@@ -37,7 +44,9 @@ protected:
 private slots:
     void onTopBackClicked();
     void onShareClicked();
-    void onModeClicked();
+    void onOriginReturnPressed();
+    void onDestinationReturnPressed();
+    void onSwapLocationsClicked();
     void onRouteOptionClicked();
     void onStartNavigationClicked();
     void onStopNavigationClicked();
@@ -48,6 +57,9 @@ private slots:
     void onNavigationTick();
     void onRouteReady(const RouteResult& result);
     void onRouteError(const QString& message);
+    void onGeocoded(double latitude, double longitude,
+                    const QString& formattedAddress);
+    void onGeocoderError(const QString& message);
 
 private:
     enum ViewState { Planning, Navigating, Finished, Error };
@@ -60,13 +72,15 @@ private:
     void renderFinished();
     void renderError(const QString& message);
     void requestRoute();
+    void resolveLocation(bool originField);
+    void replanFromCurrentInputs();
     void loadMap();
     void runMapJavaScript(const QString& script);
     QString buildNavigationMapDocument() const;
-    RouteResult makePreviewRoute() const;
     void updatePlanningMetrics();
     void updateNavigationReadout();
-    void setPlanMode(bool walking);
+    void updateGuidanceForProgress(double progress, int preferredStep = -1);
+    double routeProgressForPosition(const QPointF& position) const;
     void setMapVisible(bool visible);
     void setAllStateWidgetsVisible(bool planVisible,
                                    bool navigationVisible,
@@ -75,10 +89,10 @@ private:
     QString formatDuration(qint64 seconds) const;
     QString formatEta(qint64 secondsFromNow) const;
     QString currentLocationLabel() const;
-    bool previewMode() const;
 
     NetworkClient* networkClient_ = nullptr;
     RoutePlanner* routePlanner_ = nullptr;
+    Geocoder* geocoder_ = nullptr;
 
     QPushButton* topBackButton_ = nullptr;
     QPushButton* closeButton_ = nullptr;
@@ -86,12 +100,13 @@ private:
     QLabel* pageTitle_ = nullptr;
 
     QFrame* routeSummaryCard_ = nullptr;
-    QLabel* originLabel_ = nullptr;
-    QLabel* destinationLabel_ = nullptr;
+    QLabel* originCaptionLabel_ = nullptr;
+    QLabel* destinationCaptionLabel_ = nullptr;
+    QLineEdit* originEdit_ = nullptr;
+    QLineEdit* destinationEdit_ = nullptr;
     QLabel* routeSummaryMetaLabel_ = nullptr;
     QPushButton* swapRouteButton_ = nullptr;
 
-    QList<QPushButton*> modeButtons_;
     QFrame* mapFrame_ = nullptr;
     QWebEngineView* mapView_ = nullptr;
     QLabel* mapStateLabel_ = nullptr;
@@ -113,12 +128,6 @@ private:
     QFrame* turnArrowWidget_ = nullptr;
     QLabel* guidanceDistanceLabel_ = nullptr;
     QLabel* guidanceRoadLabel_ = nullptr;
-    QLabel* guidanceTurnLabel_ = nullptr;
-    QFrame* laneGuideWidget_ = nullptr;
-    QPushButton* muteButton_ = nullptr;
-    QLabel* guidanceTimeLabel_ = nullptr;
-    QLabel* guidanceDistanceMetaLabel_ = nullptr;
-    QLabel* guidanceEtaLabel_ = nullptr;
 
     QFrame* navigationBottomCard_ = nullptr;
     QLabel* remainingDistanceLabel_ = nullptr;
@@ -147,16 +156,22 @@ private:
 
     QTimer* navigationTimer_ = nullptr;
     ViewState state_ = Planning;
-    bool walking_ = false;
-    bool muted_ = false;
-    bool previewMode_ = false;
     bool routeLoading_ = false;
+    enum class LocationField { None, Origin, Destination };
+    LocationField geocodingField_ = LocationField::None;
     int selectedRouteOption_ = 0;
     qint64 navigationStartedAtMs_ = 0;
     qint64 simulatedElapsedSeconds_ = 0;
+    int activeStepIndex_ = 0;
+    double navigationProgress_ = 0.0;
+    QPointF currentPosition_;
+    bool positionDriven_ = false;
 
     double destinationLatitude_ = 0.0;
     double destinationLongitude_ = 0.0;
+    double originLatitude_ = 0.0;
+    double originLongitude_ = 0.0;
+    QString originName_;
     QString destinationName_;
     RouteResult route_;
 };
