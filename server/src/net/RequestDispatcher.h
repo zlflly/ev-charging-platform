@@ -15,6 +15,7 @@
 #include "net/SessionManager.h"
 #include "protocol/Protocol.h"
 #include "service/UserService.h"
+#include "service/StationService.h"
 
 namespace net {
 
@@ -27,6 +28,7 @@ public:
     explicit RequestDispatcher(QObject* parent = nullptr)
         : QObject(parent)
         , m_userService(new service::UserService(this))
+        , m_stationService(new service::StationService(this))
     {
         // 公共接口
         registerHandler(protocol::action::kPing, &RequestDispatcher::handlePing);
@@ -36,8 +38,11 @@ public:
         registerHandler(protocol::action::kUserProfileUpdate, &RequestDispatcher::handleUserProfileUpdate);
         registerHandler(protocol::action::kUserRecharge, &RequestDispatcher::handleUserRecharge);
 
+        // 站点查询接口（Commit 4）
+        registerHandler(protocol::action::kStationNearby, &RequestDispatcher::handleStationNearby);
+        registerHandler(protocol::action::kStationDetail, &RequestDispatcher::handleStationDetail);
+
         // 后续 Commit 补充：
-        // Commit 4: station.nearby / station.detail
         // Commit 5: order.* (reserve/start/stop/settle/history/active/status)
         // Commit 6: admin.*
     }
@@ -140,9 +145,24 @@ private:
         connection->sendResponse(protocol::buildResponse(request.requestId, response));
     }
 
+    // Commit 4: 站点查询接口
+
+    void handleStationNearby(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_stationService->handleNearby(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleStationDetail(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_stationService->handleDetail(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
 private:
     QHash<QString, Handler> m_handlers;
     service::UserService* m_userService;
+    service::StationService* m_stationService;
 };
 
 } // namespace net

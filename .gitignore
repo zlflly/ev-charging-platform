@@ -53,6 +53,7 @@ mock-state.json
 *.swo
 *~
 .DS_Store
+CLION_SETUP.md
 
 # Test artifacts
 test_output/
