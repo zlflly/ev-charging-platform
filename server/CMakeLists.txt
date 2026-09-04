@@ -28,6 +28,8 @@ qt_add_executable(ev-server
     src/net/TcpConnection.h
     src/net/TcpServer.h
     src/net/RequestDispatcher.h
+    src/net/SessionManager.h
+    src/net/SessionManager.cpp
     src/repository/Database.h
     src/repository/Database.cpp
     src/repository/UserRepository.h
@@ -40,6 +42,8 @@ qt_add_executable(ev-server
     src/repository/ChargerRepository.cpp
     src/repository/OrderRepository.h
     src/repository/OrderRepository.cpp
+    src/service/UserService.h
+    src/service/UserService.cpp
 )
 
 target_include_directories(ev-server PRIVATE src)

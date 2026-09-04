@@ -3,9 +3,8 @@
 // ============================================================================
 // RequestDispatcher：action → handler 的路由表 + 通用拦截（登录检查）
 //
-// Commit 0 实现：
-// - 只注册 PING handler
-// - 其他 action 在后续 commit 补充（Commit 1: 用户登录/充值等）
+// Commit 0 实现：PING handler
+// Commit 3 实现：user.login / user.profile.update / user.recharge
 // ============================================================================
 
 #include <QDateTime>
@@ -13,7 +12,9 @@
 #include <QObject>
 
 #include "net/TcpConnection.h"
+#include "net/SessionManager.h"
 #include "protocol/Protocol.h"
+#include "service/UserService.h"
 
 namespace net {
 
@@ -25,9 +26,20 @@ class RequestDispatcher : public QObject {
 public:
     explicit RequestDispatcher(QObject* parent = nullptr)
         : QObject(parent)
+        , m_userService(new service::UserService(this))
     {
+        // 公共接口
         registerHandler(protocol::action::kPing, &RequestDispatcher::handlePing);
-        // Commit 1+ 会在这里注册 user.login、user.recharge、station.nearby 等
+
+        // 用户端接口（Commit 3）
+        registerHandler(protocol::action::kUserLogin, &RequestDispatcher::handleUserLogin);
+        registerHandler(protocol::action::kUserProfileUpdate, &RequestDispatcher::handleUserProfileUpdate);
+        registerHandler(protocol::action::kUserRecharge, &RequestDispatcher::handleUserRecharge);
+
+        // 后续 Commit 补充：
+        // Commit 4: station.nearby / station.detail
+        // Commit 5: order.* (reserve/start/stop/settle/history/active/status)
+        // Commit 6: admin.*
     }
 
     void dispatch(const protocol::Request& request, TcpConnection* connection)
@@ -43,11 +55,15 @@ public:
             return;
         }
 
-        // Commit 1 会在这里加登录拦截：
-        // if (!isPublicAction(action) && !connection->isUserLoggedIn() && !connection->isAdminLoggedIn()) {
-        //     connection->sendResponse(protocol::buildErrorResponse(..., CodeNotLoggedIn, ...));
-        //     return;
-        // }
+        // 登录拦截：某些 action 需要登录状态
+        if (requiresAuth(action) && !SessionManager::instance().isUserLoggedIn(connection->socket())
+            && !SessionManager::instance().isAdminLoggedIn(connection->socket())) {
+            qWarning() << "[Dispatcher] action" << action << "requires login";
+            connection->sendResponse(protocol::buildErrorResponse(
+                request.requestId, protocol::CodeNotLoggedIn,
+                QStringLiteral("请先登录")));
+            return;
+        }
 
         (this->*m_handlers[action])(request, connection);
     }
@@ -58,8 +74,40 @@ private:
         m_handlers[action] = handler;
     }
 
+    // 判断 action 是否需要登录
+    bool requiresAuth(const QString& action) const
+    {
+        // 公共接口无需登录
+        if (action == protocol::action::kPing) {
+            return false;
+        }
+
+        // user.login 无需登录（登录接口本身）
+        if (action == protocol::action::kUserLogin) {
+            return false;
+        }
+
+        // admin.login 无需登录
+        if (action == protocol::action::kAdminLogin) {
+            return false;
+        }
+
+        // 其他 user.* 和 order.* 需要登录
+        if (action.startsWith("user.") || action.startsWith("order.")) {
+            return true;
+        }
+
+        // admin.* 需要管理员登录（后续 Commit 6 补充细粒度检查）
+        if (action.startsWith("admin.")) {
+            return true;
+        }
+
+        // station.* 不需要登录（公开查询）
+        return false;
+    }
+
     // ========================================================================
-    // Action handlers（Commit 0 只有 PING，其他在后续 commit）
+    // Action handlers
     // ========================================================================
 
     void handlePing(const protocol::Request& request, TcpConnection* connection)
@@ -72,34 +120,29 @@ private:
         connection->sendResponse(protocol::buildSuccessResponse(request.requestId, data));
     }
 
-    // Commit 1+ handlers:
-    // - handleUserLogin
-    // - handleUserProfileUpdate
-    // - handleUserRecharge
-    // - handleStationNearby
-    // - handleStationDetail
-    // - handleOrderReserve
-    // - handleOrderStart
-    // - handleOrderStop
-    // - handleOrderSettle
-    // - handleOrderHistory
-    // - handleOrderActive
-    // - handleOrderStatus
-    //
-    // Commit 6 admin handlers:
-    // - handleAdminLogin
-    // - handleAdminUsersList
-    // - handleAdminUsersFreeze
-    // - handleAdminStationsList
-    // - handleAdminStationsCreate
-    // - handleAdminChargersList
-    // - handleAdminChargersRestart
-    // - handleAdminRevenueSummary
-    // - handleAdminRevenueTrend
-    // - handleAdminChargersStats
+    // Commit 3: 用户业务接口
+
+    void handleUserLogin(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_userService->handleLogin(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleUserProfileUpdate(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_userService->handleProfileUpdate(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleUserRecharge(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_userService->handleRecharge(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
 
 private:
     QHash<QString, Handler> m_handlers;
+    service::UserService* m_userService;
 };
 
 } // namespace net

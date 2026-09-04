@@ -11,6 +11,7 @@
 
 #include "config/ServerConfig.h"
 #include "net/TcpConnection.h"
+#include "net/SessionManager.h"
 
 namespace net {
 
@@ -76,6 +77,9 @@ private slots:
 
     void onConnectionClosed(net::TcpConnection* connection)
     {
+        // 清除会话
+        SessionManager::instance().clearSession(connection->socket());
+
         m_connections.remove(connection);
         qInfo() << "[TcpServer] active connections:" << m_connections.size();
     }

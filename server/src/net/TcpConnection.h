@@ -52,6 +52,9 @@ public:
     bool isUserLoggedIn() const { return m_userId > 0; }
     bool isAdminLoggedIn() const { return m_adminId > 0; }
 
+    // 获取底层 socket（供 SessionManager 使用）
+    QTcpSocket* socket() const { return m_socket; }
+
     void sendResponse(const QJsonObject& response)
     {
         const QByteArray payload = QJsonDocument(response).toJson(QJsonDocument::Compact);
