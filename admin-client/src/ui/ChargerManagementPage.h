@@ -26,6 +26,7 @@ public:
 private:
     void updateSelection(const QModelIndex& current);
     void restartSelectedCharger();
+    void changeSelectedChargerStatus();
     void setLoading(bool loading);
     void showError(const QString& message);
     void showChargers(const QList<Charger>& chargers);
@@ -50,6 +51,7 @@ private:
     QPushButton* faultAlertButton_ = nullptr;
     QPushButton* refreshButton_ = nullptr;
     QPushButton* restartButton_ = nullptr;
+    QPushButton* statusButton_ = nullptr;
     QList<Charger> allChargers_;
     QHash<qint64, Charger> chargersById_;
 };

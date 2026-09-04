@@ -12,6 +12,7 @@ class QStackedWidget;
 class QWidget;
 class ChargerStatusOverviewWidget;
 class ChargerManagementPage;
+class StationManagementPage;
 
 class MainWindow final : public QMainWindow
 {
@@ -30,7 +31,6 @@ private:
     QWidget* createSidebar();
     QWidget* createTopbar();
     QWidget* createOverviewPage();
-    QWidget* createStationPage();
     QWidget* createUserPage();
     QWidget* createRevenuePage();
     QWidget* createMetricCard(const QString& label,
@@ -64,6 +64,7 @@ private:
     QLabel* chargerTotalLabel_ = nullptr;
     ChargerStatusOverviewWidget* chargerOverviewWidget_ = nullptr;
     ChargerManagementPage* chargerManagementPage_ = nullptr;
+    StationManagementPage* stationManagementPage_ = nullptr;
     QPushButton* connectionButton_ = nullptr;
     QList<QPushButton*> navigationButtons_;
 };

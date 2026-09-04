@@ -38,3 +38,25 @@ struct ChargerFilter final
 
     bool matches(const Charger& charger) const;
 };
+
+struct ChargerStatusUpdateRequest final
+{
+    qint64 chargerId = 0;
+    int expectedStatus = -1;
+    int targetStatus = -1;
+    QString reason;
+
+    bool validate(QString* errorMessage) const;
+    QJsonObject toJson() const;
+};
+
+struct ChargerStatusUpdateResult final
+{
+    qint64 chargerId = 0;
+    int previousStatus = -1;
+    int status = -1;
+
+    static bool fromJson(const QJsonObject& json,
+                         ChargerStatusUpdateResult* result,
+                         QString* errorMessage);
+};

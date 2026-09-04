@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <cmath>
 #include <cstring>
+#include <limits>
 
 namespace {
 
@@ -69,9 +70,48 @@ QJsonArray mockChargers()
             {QStringLiteral("totalChargeCount"), 36 + index * 7},
             {QStringLiteral("totalChargeDurationSeconds"),
              5400 + index * 1800},
+            {QStringLiteral("pricePerKwh"), fast ? 1.20 : 0.80},
         });
     }
     return chargers;
+}
+
+QJsonArray mockStations()
+{
+    return {
+        QJsonObject {
+            {QStringLiteral("stationId"), 1},
+            {QStringLiteral("name"), QStringLiteral("良乡大学城站")},
+            {QStringLiteral("address"), QStringLiteral("北京市房山区良乡大学城北路")},
+            {QStringLiteral("latitude"), 39.731320},
+            {QStringLiteral("longitude"), 116.171590},
+            {QStringLiteral("version"), 1},
+        },
+        QJsonObject {
+            {QStringLiteral("stationId"), 2},
+            {QStringLiteral("name"), QStringLiteral("中关村科技园站")},
+            {QStringLiteral("address"), QStringLiteral("北京市海淀区中关村大街")},
+            {QStringLiteral("latitude"), 39.983420},
+            {QStringLiteral("longitude"), 116.316510},
+            {QStringLiteral("version"), 1},
+        },
+        QJsonObject {
+            {QStringLiteral("stationId"), 3},
+            {QStringLiteral("name"), QStringLiteral("西山运营站")},
+            {QStringLiteral("address"), QStringLiteral("北京市海淀区西山产业园")},
+            {QStringLiteral("latitude"), 39.994610},
+            {QStringLiteral("longitude"), 116.196780},
+            {QStringLiteral("version"), 1},
+        },
+        QJsonObject {
+            {QStringLiteral("stationId"), 4},
+            {QStringLiteral("name"), QStringLiteral("亦庄待投运站")},
+            {QStringLiteral("address"), QStringLiteral("北京市大兴区亦庄新城")},
+            {QStringLiteral("latitude"), 39.794310},
+            {QStringLiteral("longitude"), 116.506840},
+            {QStringLiteral("version"), 1},
+        },
+    };
 }
 
 class MockServer final : public QObject
@@ -79,6 +119,8 @@ class MockServer final : public QObject
 public:
     explicit MockServer(QObject* parent = nullptr)
         : QObject(parent)
+        , stations_(mockStations())
+        , chargers_(mockChargers())
     {
         connect(&server_, &QTcpServer::newConnection, this, [this] {
             while (auto* socket = server_.nextPendingConnection()) {
@@ -103,6 +145,80 @@ public:
     }
 
 private:
+    QJsonObject findStation(qint64 stationId) const
+    {
+        for (const QJsonValue value : stations_) {
+            const QJsonObject station = value.toObject();
+            if (static_cast<qint64>(station.value(
+                    QStringLiteral("stationId")).toDouble()) == stationId) {
+                return station;
+            }
+        }
+        return {};
+    }
+
+    QJsonArray stationListPayload() const
+    {
+        QJsonArray payload;
+        for (const QJsonValue stationValue : stations_) {
+            QJsonObject station = stationValue.toObject();
+            const qint64 stationId = static_cast<qint64>(
+                station.value(QStringLiteral("stationId")).toDouble());
+            int totalCount = 0;
+            int offlineCount = 0;
+            for (const QJsonValue chargerValue : chargers_) {
+                const QJsonObject charger = chargerValue.toObject();
+                if (static_cast<qint64>(charger.value(
+                        QStringLiteral("stationId")).toDouble()) != stationId) {
+                    continue;
+                }
+                ++totalCount;
+                if (charger.value(QStringLiteral("status")).toInt()
+                    == protocol::ChargerStatusOffline) {
+                    ++offlineCount;
+                }
+            }
+            const double onlineRate = totalCount == 0
+                ? 0.0
+                : 100.0 * static_cast<double>(totalCount - offlineCount)
+                    / static_cast<double>(totalCount);
+            station.insert(QStringLiteral("totalCount"), totalCount);
+            station.insert(QStringLiteral("onlineRate"), onlineRate);
+            payload.append(station);
+        }
+        return payload;
+    }
+
+    QJsonObject stationDetailPayload(qint64 stationId) const
+    {
+        QJsonObject station = findStation(stationId);
+        if (station.isEmpty()) {
+            return {};
+        }
+        QJsonArray detailChargers;
+        for (const QJsonValue chargerValue : chargers_) {
+            const QJsonObject charger = chargerValue.toObject();
+            if (static_cast<qint64>(charger.value(
+                    QStringLiteral("stationId")).toDouble()) != stationId) {
+                continue;
+            }
+            detailChargers.append(QJsonObject {
+                {QStringLiteral("chargerId"),
+                 charger.value(QStringLiteral("chargerId"))},
+                {QStringLiteral("chargerCode"),
+                 charger.value(QStringLiteral("code"))},
+                {QStringLiteral("type"), charger.value(QStringLiteral("type"))},
+                {QStringLiteral("power"),
+                 charger.value(QStringLiteral("powerKw"))},
+                {QStringLiteral("status"), charger.value(QStringLiteral("status"))},
+                {QStringLiteral("pricePerKwh"),
+                 charger.value(QStringLiteral("pricePerKwh"))},
+            });
+        }
+        station.insert(QStringLiteral("chargers"), detailChargers);
+        return station;
+    }
+
     void process(QTcpSocket* socket)
     {
         QByteArray& buffer = buffers_[socket];
@@ -170,16 +286,35 @@ private:
                                 QStringLiteral("administrator login required"));
             } else {
                 // 仅用于客户端联调；真实数量和占比必须由成员 1 的服务端聚合。
+                int counts[4] = {0, 0, 0, 0};
+                for (const QJsonValue value : chargers_) {
+                    const int status = value.toObject().value(
+                        QStringLiteral("status")).toInt(-1);
+                    if (status >= protocol::ChargerStatusIdle
+                        && status <= protocol::ChargerStatusOffline) {
+                        ++counts[status];
+                    }
+                }
+                const int total = chargers_.size();
+                const auto percent = [total](int count) {
+                    return total == 0 ? 0.0
+                                      : 100.0 * static_cast<double>(count)
+                                          / static_cast<double>(total);
+                };
                 response.insert(QStringLiteral("data"), QJsonObject {
-                    {QStringLiteral("total"), 12},
-                    {QStringLiteral("idle"), 6},
-                    {QStringLiteral("charging"), 3},
-                    {QStringLiteral("fault"), 2},
-                    {QStringLiteral("offline"), 1},
-                    {QStringLiteral("idlePercent"), 50.0},
-                    {QStringLiteral("chargingPercent"), 25.0},
-                    {QStringLiteral("faultPercent"), 16.7},
-                    {QStringLiteral("offlinePercent"), 8.3},
+                    {QStringLiteral("total"), total},
+                    {QStringLiteral("idle"), counts[protocol::ChargerStatusIdle]},
+                    {QStringLiteral("charging"), counts[protocol::ChargerStatusCharging]},
+                    {QStringLiteral("fault"), counts[protocol::ChargerStatusFault]},
+                    {QStringLiteral("offline"), counts[protocol::ChargerStatusOffline]},
+                    {QStringLiteral("idlePercent"),
+                     percent(counts[protocol::ChargerStatusIdle])},
+                    {QStringLiteral("chargingPercent"),
+                     percent(counts[protocol::ChargerStatusCharging])},
+                    {QStringLiteral("faultPercent"),
+                     percent(counts[protocol::ChargerStatusFault])},
+                    {QStringLiteral("offlinePercent"),
+                     percent(counts[protocol::ChargerStatusOffline])},
                     {QStringLiteral("updatedAt"),
                      QDateTime::currentMSecsSinceEpoch()},
                 });
@@ -192,7 +327,7 @@ private:
                                 QStringLiteral("administrator login required"));
             } else {
                 response.insert(QStringLiteral("data"), QJsonObject {
-                    {QStringLiteral("chargers"), mockChargers()},
+                    {QStringLiteral("chargers"), chargers_},
                 });
             }
         } else if (action == QString::fromUtf8(
@@ -214,8 +349,7 @@ private:
                     ? static_cast<qint64>(chargerIdNumber) : 0;
                 QJsonObject selected;
                 if (validChargerId) {
-                    const QJsonArray chargers = mockChargers();
-                    for (const QJsonValue value : chargers) {
+                    for (const QJsonValue value : chargers_) {
                         const QJsonObject charger = value.toObject();
                         if (static_cast<qint64>(charger.value(
                                 QStringLiteral("chargerId")).toDouble()) == chargerId) {
@@ -249,6 +383,329 @@ private:
                     });
                 }
             }
+        } else if (action == QString::fromUtf8(
+                       protocol::action::kAdminChargerStatusUpdate)) {
+            if (adminIds_.value(socket) <= 0) {
+                response.insert(QStringLiteral("code"), protocol::CodeNotLoggedIn);
+                response.insert(QStringLiteral("message"),
+                                QStringLiteral("administrator login required"));
+            } else {
+                const QJsonValue chargerIdValue = requestData.value(
+                    QStringLiteral("chargerId"));
+                const QJsonValue expectedValue = requestData.value(
+                    QStringLiteral("expectedStatus"));
+                const QJsonValue targetValue = requestData.value(
+                    QStringLiteral("targetStatus"));
+                const QString reason = requestData.value(
+                    QStringLiteral("reason")).toString().trimmed();
+                const double chargerIdNumber = chargerIdValue.toDouble(-1.0);
+                const double expectedNumber = expectedValue.toDouble(-1.0);
+                const double targetNumber = targetValue.toDouble(-1.0);
+                const auto validNumber = [](const QJsonValue& value,
+                                            double number) {
+                    return value.isDouble() && std::isfinite(number)
+                        && std::floor(number) == number;
+                };
+                const bool validTarget = targetNumber == protocol::ChargerStatusIdle
+                    || targetNumber == protocol::ChargerStatusFault
+                    || targetNumber == protocol::ChargerStatusOffline;
+                const bool valid = validNumber(chargerIdValue, chargerIdNumber)
+                    && chargerIdNumber > 0.0
+                    && chargerIdNumber <= 9007199254740991.0
+                    && validNumber(expectedValue, expectedNumber)
+                    && expectedNumber >= protocol::ChargerStatusIdle
+                    && expectedNumber <= protocol::ChargerStatusOffline
+                    && validNumber(targetValue, targetNumber) && validTarget
+                    && expectedNumber != targetNumber
+                    && reason.size() >= 2 && reason.size() <= 200;
+                int selectedIndex = -1;
+                if (valid) {
+                    for (int index = 0; index < chargers_.size(); ++index) {
+                        const QJsonObject charger = chargers_.at(index).toObject();
+                        if (charger.value(QStringLiteral("chargerId")).toDouble()
+                            == chargerIdNumber) {
+                            selectedIndex = index;
+                            break;
+                        }
+                    }
+                }
+                if (!valid) {
+                    response.insert(QStringLiteral("code"), protocol::CodeBadRequest);
+                    response.insert(QStringLiteral("message"),
+                                    QStringLiteral("设备状态变更参数不符合协议"));
+                } else if (selectedIndex < 0) {
+                    response.insert(QStringLiteral("code"), protocol::CodeBadRequest);
+                    response.insert(QStringLiteral("message"),
+                                    QStringLiteral("充电桩不存在"));
+                } else {
+                    QJsonObject charger = chargers_.at(selectedIndex).toObject();
+                    const int currentStatus = charger.value(
+                        QStringLiteral("status")).toInt(-1);
+                    if (currentStatus == protocol::ChargerStatusCharging) {
+                        response.insert(QStringLiteral("code"),
+                                        protocol::CodeChargerOperationRejected);
+                        response.insert(QStringLiteral("message"),
+                                        QStringLiteral("充电桩正在服务订单，禁止强制修改状态"));
+                    } else if (currentStatus != static_cast<int>(expectedNumber)) {
+                        response.insert(QStringLiteral("code"),
+                                        protocol::CodeChargerStateConflict);
+                        response.insert(QStringLiteral("message"),
+                                        QStringLiteral("充电桩状态已变化，请刷新后重试"));
+                    } else {
+                        const int targetStatus = static_cast<int>(targetNumber);
+                        charger.insert(QStringLiteral("status"), targetStatus);
+                        chargers_.replace(selectedIndex, charger);
+                        response.insert(QStringLiteral("message"),
+                                        QStringLiteral("设备状态已更新"));
+                        response.insert(QStringLiteral("data"), QJsonObject {
+                            {QStringLiteral("chargerId"), chargerIdNumber},
+                            {QStringLiteral("previousStatus"), currentStatus},
+                            {QStringLiteral("status"), targetStatus},
+                            {QStringLiteral("changedAt"),
+                             QDateTime::currentMSecsSinceEpoch()},
+                        });
+                    }
+                }
+            }
+        } else if (action == QString::fromUtf8(
+                       protocol::action::kAdminStationList)) {
+            if (adminIds_.value(socket) <= 0) {
+                response.insert(QStringLiteral("code"), protocol::CodeNotLoggedIn);
+                response.insert(QStringLiteral("message"),
+                                QStringLiteral("administrator login required"));
+            } else {
+                response.insert(QStringLiteral("data"), QJsonObject {
+                    {QStringLiteral("stations"), stationListPayload()},
+                });
+            }
+        } else if (action == QString::fromUtf8(
+                       protocol::action::kStationDetail)) {
+            const QJsonValue stationIdValue =
+                requestData.value(QStringLiteral("stationId"));
+            const double stationIdNumber = stationIdValue.toDouble();
+            const bool validStationId = stationIdValue.isDouble()
+                && std::isfinite(stationIdNumber) && stationIdNumber >= 1.0
+                && stationIdNumber <= 9007199254740991.0
+                && std::floor(stationIdNumber) == stationIdNumber;
+            const qint64 stationId = validStationId
+                ? static_cast<qint64>(stationIdNumber) : 0;
+            const QJsonObject detail = validStationId
+                ? stationDetailPayload(stationId) : QJsonObject{};
+            if (!validStationId) {
+                response.insert(QStringLiteral("code"), protocol::CodeBadRequest);
+                response.insert(QStringLiteral("message"),
+                                QStringLiteral("stationId must be a positive integer"));
+            } else if (detail.isEmpty()) {
+                response.insert(QStringLiteral("code"), protocol::CodeBadRequest);
+                response.insert(QStringLiteral("message"),
+                                QStringLiteral("充电站不存在"));
+            } else {
+                response.insert(QStringLiteral("data"), detail);
+            }
+        } else if (action == QString::fromUtf8(
+                       protocol::action::kAdminStationCreate)) {
+            if (adminIds_.value(socket) <= 0) {
+                response.insert(QStringLiteral("code"), protocol::CodeNotLoggedIn);
+                response.insert(QStringLiteral("message"),
+                                QStringLiteral("administrator login required"));
+            } else {
+                const QString name = requestData.value(
+                    QStringLiteral("name")).toString().trimmed();
+                const QString address = requestData.value(
+                    QStringLiteral("address")).toString().trimmed();
+                const QJsonValue latitudeValue = requestData.value(
+                    QStringLiteral("latitude"));
+                const QJsonValue longitudeValue = requestData.value(
+                    QStringLiteral("longitude"));
+                const QJsonValue countValue = requestData.value(
+                    QStringLiteral("chargerCount"));
+                const double latitude = latitudeValue.toDouble(
+                    std::numeric_limits<double>::quiet_NaN());
+                const double longitude = longitudeValue.toDouble(
+                    std::numeric_limits<double>::quiet_NaN());
+                const double countNumber = countValue.toDouble(-1.0);
+                const bool valid = !name.isEmpty() && name.size() <= 60
+                    && !address.isEmpty() && address.size() <= 200
+                    && latitudeValue.isDouble() && std::isfinite(latitude)
+                    && latitude >= -90.0 && latitude <= 90.0
+                    && longitudeValue.isDouble() && std::isfinite(longitude)
+                    && longitude >= -180.0 && longitude <= 180.0
+                    && countValue.isDouble() && std::isfinite(countNumber)
+                    && countNumber >= 0.0 && countNumber <= 100.0
+                    && std::floor(countNumber) == countNumber;
+                bool duplicate = false;
+                if (valid) {
+                    for (const QJsonValue value : stations_) {
+                        const QJsonObject station = value.toObject();
+                        if (station.value(QStringLiteral("name")).toString()
+                                    .compare(name, Qt::CaseInsensitive) == 0
+                            && station.value(QStringLiteral("address")).toString()
+                                   .compare(address, Qt::CaseInsensitive) == 0) {
+                            duplicate = true;
+                            break;
+                        }
+                    }
+                }
+                if (!valid) {
+                    response.insert(QStringLiteral("code"), protocol::CodeBadRequest);
+                    response.insert(QStringLiteral("message"),
+                                    QStringLiteral("站点新增参数不符合协议"));
+                } else if (duplicate) {
+                    response.insert(QStringLiteral("code"), protocol::CodeBadRequest);
+                    response.insert(QStringLiteral("message"),
+                                    QStringLiteral("已存在同名同址站点"));
+                } else {
+                    qint64 stationId = 1;
+                    qint64 chargerId = 1001;
+                    for (const QJsonValue value : stations_) {
+                        stationId = qMax(stationId,
+                            static_cast<qint64>(value.toObject().value(
+                                QStringLiteral("stationId")).toDouble()) + 1);
+                    }
+                    for (const QJsonValue value : chargers_) {
+                        chargerId = qMax(chargerId,
+                            static_cast<qint64>(value.toObject().value(
+                                QStringLiteral("chargerId")).toDouble()) + 1);
+                    }
+                    stations_.append(QJsonObject {
+                        {QStringLiteral("stationId"), stationId},
+                        {QStringLiteral("name"), name},
+                        {QStringLiteral("address"), address},
+                        {QStringLiteral("latitude"), latitude},
+                        {QStringLiteral("longitude"), longitude},
+                        {QStringLiteral("version"), 1},
+                    });
+                    const int chargerCount = static_cast<int>(countNumber);
+                    for (int index = 0; index < chargerCount; ++index) {
+                        const bool fast = index % 2 == 0;
+                        chargers_.append(QJsonObject {
+                            {QStringLiteral("chargerId"), chargerId + index},
+                            {QStringLiteral("code"),
+                             QStringLiteral("ST-%1-CP-%2")
+                                 .arg(stationId)
+                                 .arg(index + 1, 3, 10, QChar(u'0'))},
+                            {QStringLiteral("stationId"), stationId},
+                            {QStringLiteral("stationName"), name},
+                            {QStringLiteral("type"), fast
+                                 ? protocol::ChargerTypeFast
+                                 : protocol::ChargerTypeSlow},
+                            {QStringLiteral("powerKw"), fast ? 120.0 : 7.0},
+                            {QStringLiteral("status"), protocol::ChargerStatusIdle},
+                            {QStringLiteral("totalChargeCount"), 0},
+                            {QStringLiteral("totalChargeDurationSeconds"), 0},
+                            {QStringLiteral("pricePerKwh"), fast ? 1.20 : 0.80},
+                        });
+                    }
+                    response.insert(QStringLiteral("message"),
+                                    QStringLiteral("充电站创建成功"));
+                    response.insert(QStringLiteral("data"), QJsonObject {
+                        {QStringLiteral("stationId"), stationId},
+                        {QStringLiteral("createdChargerCount"), chargerCount},
+                    });
+                }
+            }
+        } else if (action == QString::fromUtf8(
+                       protocol::action::kAdminStationUpdate)) {
+            if (adminIds_.value(socket) <= 0) {
+                response.insert(QStringLiteral("code"), protocol::CodeNotLoggedIn);
+                response.insert(QStringLiteral("message"),
+                                QStringLiteral("administrator login required"));
+            } else {
+                const QJsonValue stationIdValue = requestData.value(
+                    QStringLiteral("stationId"));
+                const QJsonValue versionValue = requestData.value(
+                    QStringLiteral("expectedVersion"));
+                const QJsonValue latitudeValue = requestData.value(
+                    QStringLiteral("latitude"));
+                const QJsonValue longitudeValue = requestData.value(
+                    QStringLiteral("longitude"));
+                const QString name = requestData.value(
+                    QStringLiteral("name")).toString().trimmed();
+                const QString address = requestData.value(
+                    QStringLiteral("address")).toString().trimmed();
+                const double stationIdNumber = stationIdValue.toDouble(-1.0);
+                const double versionNumber = versionValue.toDouble(-1.0);
+                const double latitude = latitudeValue.toDouble(
+                    std::numeric_limits<double>::quiet_NaN());
+                const double longitude = longitudeValue.toDouble(
+                    std::numeric_limits<double>::quiet_NaN());
+                const bool valid = stationIdValue.isDouble()
+                    && std::isfinite(stationIdNumber) && stationIdNumber > 0.0
+                    && stationIdNumber <= 9007199254740991.0
+                    && std::floor(stationIdNumber) == stationIdNumber
+                    && versionValue.isDouble() && std::isfinite(versionNumber)
+                    && versionNumber > 0.0 && std::floor(versionNumber) == versionNumber
+                    && !name.isEmpty() && name.size() <= 60
+                    && !address.isEmpty() && address.size() <= 200
+                    && latitudeValue.isDouble() && std::isfinite(latitude)
+                    && latitude >= -90.0 && latitude <= 90.0
+                    && longitudeValue.isDouble() && std::isfinite(longitude)
+                    && longitude >= -180.0 && longitude <= 180.0;
+                int stationIndex = -1;
+                bool duplicate = false;
+                if (valid) {
+                    for (int index = 0; index < stations_.size(); ++index) {
+                        const QJsonObject station = stations_.at(index).toObject();
+                        const double existingId = station.value(
+                            QStringLiteral("stationId")).toDouble();
+                        if (existingId == stationIdNumber) {
+                            stationIndex = index;
+                        } else if (station.value(QStringLiteral("name")).toString()
+                                       .compare(name, Qt::CaseInsensitive) == 0
+                                   && station.value(QStringLiteral("address")).toString()
+                                          .compare(address, Qt::CaseInsensitive) == 0) {
+                            duplicate = true;
+                        }
+                    }
+                }
+                if (!valid) {
+                    response.insert(QStringLiteral("code"), protocol::CodeBadRequest);
+                    response.insert(QStringLiteral("message"),
+                                    QStringLiteral("站点编辑参数不符合协议"));
+                } else if (stationIndex < 0) {
+                    response.insert(QStringLiteral("code"), protocol::CodeBadRequest);
+                    response.insert(QStringLiteral("message"),
+                                    QStringLiteral("充电站不存在"));
+                } else if (duplicate) {
+                    response.insert(QStringLiteral("code"), protocol::CodeBadRequest);
+                    response.insert(QStringLiteral("message"),
+                                    QStringLiteral("已存在同名同址站点"));
+                } else {
+                    QJsonObject station = stations_.at(stationIndex).toObject();
+                    const qint64 currentVersion = static_cast<qint64>(
+                        station.value(QStringLiteral("version")).toDouble());
+                    if (currentVersion != static_cast<qint64>(versionNumber)) {
+                        response.insert(QStringLiteral("code"),
+                                        protocol::CodeStationVersionConflict);
+                        response.insert(QStringLiteral("message"),
+                                        QStringLiteral("站点资料已被其他管理员修改，请刷新后重试"));
+                    } else {
+                        const qint64 nextVersion = currentVersion + 1;
+                        station.insert(QStringLiteral("name"), name);
+                        station.insert(QStringLiteral("address"), address);
+                        station.insert(QStringLiteral("latitude"), latitude);
+                        station.insert(QStringLiteral("longitude"), longitude);
+                        station.insert(QStringLiteral("version"), nextVersion);
+                        stations_.replace(stationIndex, station);
+                        for (int index = 0; index < chargers_.size(); ++index) {
+                            QJsonObject charger = chargers_.at(index).toObject();
+                            if (charger.value(QStringLiteral("stationId")).toDouble()
+                                == stationIdNumber) {
+                                charger.insert(QStringLiteral("stationName"), name);
+                                chargers_.replace(index, charger);
+                            }
+                        }
+                        response.insert(QStringLiteral("message"),
+                                        QStringLiteral("充电站资料已更新"));
+                        response.insert(QStringLiteral("data"), QJsonObject {
+                            {QStringLiteral("stationId"), stationIdNumber},
+                            {QStringLiteral("version"), nextVersion},
+                            {QStringLiteral("updatedAt"),
+                             QDateTime::currentMSecsSinceEpoch()},
+                        });
+                    }
+                }
+            }
         } else {
             response.insert(QStringLiteral("code"), 1001);
             response.insert(QStringLiteral("message"), QStringLiteral("unsupported action"));
@@ -267,6 +724,8 @@ private:
     }
 
     QTcpServer server_;
+    QJsonArray stations_;
+    QJsonArray chargers_;
     QHash<QTcpSocket*, QByteArray> buffers_;
     QHash<QTcpSocket*, qint64> adminIds_;
 };

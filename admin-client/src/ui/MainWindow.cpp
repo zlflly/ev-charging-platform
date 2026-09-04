@@ -6,6 +6,7 @@
 #include "protocol/Protocol.h"
 #include "session/AdminSession.h"
 #include "ui/ChargerManagementPage.h"
+#include "ui/StationManagementPage.h"
 #include "ui/theme/Theme.h"
 #include "ui/widgets/ChargerStatusOverviewWidget.h"
 #include "ui/widgets/EntityTableView.h"
@@ -85,7 +86,8 @@ MainWindow::MainWindow(NetworkClient* network,
     pages_->addWidget(createOverviewPage());
     chargerManagementPage_ = new ChargerManagementPage(api_, pages_);
     pages_->addWidget(chargerManagementPage_);
-    pages_->addWidget(createStationPage());
+    stationManagementPage_ = new StationManagementPage(api_, pages_);
+    pages_->addWidget(stationManagementPage_);
     pages_->addWidget(createUserPage());
     pages_->addWidget(createRevenuePage());
     workspaceLayout->addWidget(pages_, 1);
@@ -276,21 +278,6 @@ QWidget* MainWindow::createOverviewPage()
     return page;
 }
 
-QWidget* MainWindow::createStationPage()
-{
-    auto* table = new EntityTableView(
-        {QStringLiteral("站点 ID"), QStringLiteral("站名"), QStringLiteral("地址"),
-         QStringLiteral("经度"), QStringLiteral("纬度"), QStringLiteral("总桩数"),
-         QStringLiteral("在线率"), QStringLiteral("操作")}, this);
-    auto* page = new QWidget(this);
-    page->setObjectName(QStringLiteral("pageRoot"));
-    auto* layout = new QVBoxLayout(page);
-    layout->setContentsMargins(theme::kPageMargin, 20,
-                               theme::kPageMargin, theme::kPageMargin);
-    layout->addWidget(createSectionCard(QStringLiteral("充电站列表"), table));
-    return page;
-}
-
 QWidget* MainWindow::createUserPage()
 {
     auto* table = new EntityTableView(
@@ -416,6 +403,9 @@ void MainWindow::switchPage(int pageIndex)
     }
     if (pageIndex == 1 && session_->isAuthenticated() && chargerManagementPage_) {
         chargerManagementPage_->refresh();
+    }
+    if (pageIndex == 2 && session_->isAuthenticated() && stationManagementPage_) {
+        stationManagementPage_->refresh();
     }
 }
 

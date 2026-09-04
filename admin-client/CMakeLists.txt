@@ -14,10 +14,12 @@ qt_add_executable(admin-client
     src/api/AdminApiClient.cpp
     src/model/Charger.cpp
     src/model/ChargerStatusOverview.cpp
+    src/model/Station.cpp
     src/net/NetworkClient.cpp
     src/session/AdminSession.cpp
     src/ui/LoginWindow.cpp
     src/ui/ChargerManagementPage.cpp
+    src/ui/StationManagementPage.cpp
     src/ui/MainWindow.cpp
     src/ui/widgets/ChargerStatusOverviewWidget.cpp
     src/ui/widgets/EntityTableView.cpp
@@ -63,6 +65,7 @@ qt_add_executable(admin-charger-overview-smoke-test
     src/api/AdminApiClient.cpp
     src/model/Charger.cpp
     src/model/ChargerStatusOverview.cpp
+    src/model/Station.cpp
     src/net/NetworkClient.cpp
     src/session/AdminSession.cpp
 )
@@ -74,8 +77,33 @@ qt_add_executable(admin-charger-management-smoke-test
     src/api/AdminApiClient.cpp
     src/model/Charger.cpp
     src/model/ChargerStatusOverview.cpp
+    src/model/Station.cpp
     src/net/NetworkClient.cpp
     src/session/AdminSession.cpp
 )
 target_include_directories(admin-charger-management-smoke-test PRIVATE src)
 target_link_libraries(admin-charger-management-smoke-test PRIVATE Qt6::Core Qt6::Network)
+
+qt_add_executable(admin-station-management-smoke-test
+    tests/AdminStationManagementSmokeTest.cpp
+    src/api/AdminApiClient.cpp
+    src/model/Charger.cpp
+    src/model/ChargerStatusOverview.cpp
+    src/model/Station.cpp
+    src/net/NetworkClient.cpp
+    src/session/AdminSession.cpp
+)
+target_include_directories(admin-station-management-smoke-test PRIVATE src)
+target_link_libraries(admin-station-management-smoke-test PRIVATE Qt6::Core Qt6::Network)
+
+qt_add_executable(admin-station-operations-smoke-test
+    tests/AdminStationOperationsSmokeTest.cpp
+    src/api/AdminApiClient.cpp
+    src/model/Charger.cpp
+    src/model/ChargerStatusOverview.cpp
+    src/model/Station.cpp
+    src/net/NetworkClient.cpp
+    src/session/AdminSession.cpp
+)
+target_include_directories(admin-station-operations-smoke-test PRIVATE src)
+target_link_libraries(admin-station-operations-smoke-test PRIVATE Qt6::Core Qt6::Network)

@@ -180,3 +180,99 @@ bool ChargerFilter::matches(const Charger& charger) const
     const bool statusMatches = status < 0 || charger.status == status;
     return keywordMatches && stationMatches && typeMatches && statusMatches;
 }
+
+bool ChargerStatusUpdateRequest::validate(QString* errorMessage) const
+{
+    const auto isKnownStatus = [](int status) {
+        return status >= protocol::ChargerStatusIdle
+            && status <= protocol::ChargerStatusOffline;
+    };
+    const auto isAdminTarget = [](int status) {
+        return status == protocol::ChargerStatusIdle
+            || status == protocol::ChargerStatusFault
+            || status == protocol::ChargerStatusOffline;
+    };
+    const QString normalizedReason = reason.trimmed();
+    if (chargerId <= 0) {
+        if (errorMessage) {
+            *errorMessage = QStringLiteral("充电桩 ID 必须是正整数");
+        }
+        return false;
+    }
+    if (!isKnownStatus(expectedStatus)) {
+        if (errorMessage) {
+            *errorMessage = QStringLiteral("当前充电桩状态无效");
+        }
+        return false;
+    }
+    if (expectedStatus == protocol::ChargerStatusCharging) {
+        if (errorMessage) {
+            *errorMessage = QStringLiteral("在用状态由订单流程控制，管理员不能强制修改");
+        }
+        return false;
+    }
+    if (!isAdminTarget(targetStatus)) {
+        if (errorMessage) {
+            *errorMessage = QStringLiteral("管理员只能将设备调整为空闲、故障或离线");
+        }
+        return false;
+    }
+    if (targetStatus == expectedStatus) {
+        if (errorMessage) {
+            *errorMessage = QStringLiteral("目标状态不能与当前状态相同");
+        }
+        return false;
+    }
+    if (normalizedReason.size() < 2 || normalizedReason.size() > 200) {
+        if (errorMessage) {
+            *errorMessage = QStringLiteral("变更原因必须为 2～200 个字符");
+        }
+        return false;
+    }
+    if (errorMessage) {
+        errorMessage->clear();
+    }
+    return true;
+}
+
+QJsonObject ChargerStatusUpdateRequest::toJson() const
+{
+    return {
+        {QStringLiteral("chargerId"), chargerId},
+        {QStringLiteral("expectedStatus"), expectedStatus},
+        {QStringLiteral("targetStatus"), targetStatus},
+        {QStringLiteral("reason"), reason.trimmed()},
+    };
+}
+
+bool ChargerStatusUpdateResult::fromJson(const QJsonObject& json,
+                                         ChargerStatusUpdateResult* result,
+                                         QString* errorMessage)
+{
+    if (!result) {
+        return false;
+    }
+    ChargerStatusUpdateResult parsed;
+    qint64 previousStatus = 0;
+    qint64 status = 0;
+    if (!readNonNegativeInteger(json, QStringLiteral("chargerId"),
+                                &parsed.chargerId, errorMessage, true)
+        || !readNonNegativeInteger(json, QStringLiteral("previousStatus"),
+                                   &previousStatus, errorMessage)
+        || !readNonNegativeInteger(json, QStringLiteral("status"),
+                                   &status, errorMessage)
+        || previousStatus > protocol::ChargerStatusOffline
+        || status > protocol::ChargerStatusOffline) {
+        if (errorMessage && errorMessage->isEmpty()) {
+            *errorMessage = QStringLiteral("状态变更响应包含无效状态");
+        }
+        return false;
+    }
+    parsed.previousStatus = static_cast<int>(previousStatus);
+    parsed.status = static_cast<int>(status);
+    *result = parsed;
+    if (errorMessage) {
+        errorMessage->clear();
+    }
+    return true;
+}

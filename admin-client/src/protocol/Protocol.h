@@ -15,6 +15,11 @@ inline constexpr const char* kAdminLogin = "admin.login";
 inline constexpr const char* kAdminChargerOverview = "admin.charger.overview";
 inline constexpr const char* kAdminChargerList = "admin.charger.list";
 inline constexpr const char* kAdminChargerRestart = "admin.charger.restart";
+inline constexpr const char* kAdminChargerStatusUpdate = "admin.charger.status.update";
+inline constexpr const char* kAdminStationList = "admin.stations.list";
+inline constexpr const char* kAdminStationCreate = "admin.stations.create";
+inline constexpr const char* kAdminStationUpdate = "admin.stations.update";
+inline constexpr const char* kStationDetail = "station.detail";
 } // namespace action
 
 inline constexpr int kFrameLengthPrefixBytes = 4;
@@ -40,6 +45,8 @@ enum ErrorCode {
     CodeNotLoggedIn = 1003,
     CodeInvalidAdminCredentials = 1101,
     CodeChargerOperationRejected = 2101,
+    CodeStationVersionConflict = 2102,
+    CodeChargerStateConflict = 2103,
     CodeServerError = 5000,
 };
 
@@ -100,6 +107,14 @@ inline QString describeError(int code, const QString& serverMessage = {})
     case CodeChargerOperationRejected:
         return serverMessage.isEmpty()
             ? QStringLiteral("充电桩正在服务订单，当前禁止执行运维操作")
+            : serverMessage;
+    case CodeStationVersionConflict:
+        return serverMessage.isEmpty()
+            ? QStringLiteral("站点资料已被其他管理员修改，请刷新后重试")
+            : serverMessage;
+    case CodeChargerStateConflict:
+        return serverMessage.isEmpty()
+            ? QStringLiteral("充电桩状态已变化，请刷新后重试")
             : serverMessage;
     case CodeServerError:
         return serverMessage.isEmpty() ? QStringLiteral("服务器内部错误") : serverMessage;

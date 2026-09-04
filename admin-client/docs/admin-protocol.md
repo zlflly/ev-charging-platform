@@ -207,6 +207,263 @@
 > 待成员 1 冻结：累计次数是否只计算 `FINISHED` 订单，以及累计时长取
 > `stopTime-startTime` 还是独立计量字段。客户端当前只展示服务端返回值。
 
+## 充电桩运维状态变更
+
+请求 action：`admin.charger.status.update`
+
+```json
+{
+  "action": "admin.charger.status.update",
+  "requestId": "admin-5",
+  "data": {
+    "chargerId": 1001,
+    "expectedStatus": 0,
+    "targetStatus": 3,
+    "reason": "计划检修下线"
+  }
+}
+```
+
+成功响应：
+
+```json
+{
+  "requestId": "admin-5",
+  "code": 0,
+  "message": "设备状态已更新",
+  "data": {
+    "chargerId": 1001,
+    "previousStatus": 0,
+    "status": 3,
+    "changedAt": 1788480000000
+  }
+}
+```
+
+业务约束：
+
+- 这是实训项目的“模拟运维状态”接口，不是客户端直接控制真实硬件。
+- `targetStatus` 只允许 `0=空闲`、`2=故障`、`3=离线`；管理员不能把设备
+  手工设置为 `1=在用`，`1` 只能由预约/充电订单状态机产生。
+- 若当前状态为 `1`，或服务端查询到关联的活动订单，必须拒绝并返回 `2101`。
+- `expectedStatus` 必须与服务端事务内读取到的当前状态相同；不一致返回 `2103`，
+  防止管理员依据旧页面覆盖刚发生的订单或设备变化。
+- `reason` 去除首尾空白后为 2～200 个字符。真实服务端应记录管理员 ID、原因、
+  前后状态和操作时间，作为审计记录。
+- 相同状态的无效变更返回 `1001`。客户端写成功后必须重新查询，不在本地直接
+  改行；站点页还要重查站点列表，使 `onlineRate` 与详情同步。
+
+## 充电站管理列表
+
+请求 action：`admin.stations.list`
+
+```json
+{
+  "action": "admin.stations.list",
+  "requestId": "admin-5",
+  "data": {}
+}
+```
+
+成功响应：
+
+```json
+{
+  "requestId": "admin-5",
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "stations": [
+      {
+        "stationId": 1,
+        "name": "良乡大学城站",
+        "address": "北京市房山区良乡大学城北路",
+        "latitude": 39.731320,
+        "longitude": 116.171590,
+        "totalCount": 4,
+        "onlineRate": 100.0,
+        "version": 1
+      }
+    ]
+  }
+}
+```
+
+字段口径：
+
+| 字段 | 类型 | 含义 |
+|---|---|---|
+| `stationId` | 正整数 | 站点数据库主键；选择、排序和详情查询的唯一依据 |
+| `name` | 1～60 字符 | 站点显示名称 |
+| `address` | 1～200 字符 | 站点详细地址 |
+| `latitude` | 数字 | WGS-84 纬度，范围 -90～90 |
+| `longitude` | 数字 | WGS-84 经度，范围 -180～180 |
+| `totalCount` | 非负整数 | 该站全部充电桩数量，包含空闲、在用、故障和离线 |
+| `onlineRate` | 数字 | 服务端聚合的百分数，范围 0～100，不是 0～1 比例 |
+| `version` | 正整数 | 站点资料版本；编辑时用于防止并发覆盖 |
+
+在线率在本项目中的统一定义：
+
+- `onlineCount = idle + charging + fault`，仅 `offline` 不计在线；故障表示设备
+  已上报故障，仍属于在线设备。
+- `onlineRate = onlineCount / totalCount * 100`，由服务端基于同一次数据快照聚合。
+- `totalCount=0` 时固定返回 `onlineRate=0.0`。
+- 客户端只校验并显示 `totalCount`、`onlineRate`，不下载桩列表重复计算在线率。
+- 此接口要求当前 TCP 连接已完成管理员登录，未登录返回 `1003`。
+
+> action 名使用成员 1 协议框架中已有的复数形式 `admin.stations.list`。现有
+> Commit 3 的 `admin.charger.list/restart` 暂不在本节点改名，避免破坏已验证功能；
+> 真实服务端接入前需单独统一这组历史名称。
+
+## 编辑充电站资料
+
+请求 action：`admin.stations.update`
+
+```json
+{
+  "action": "admin.stations.update",
+  "requestId": "admin-7",
+  "data": {
+    "stationId": 1,
+    "expectedVersion": 1,
+    "name": "良乡大学城智慧站",
+    "address": "北京市房山区良乡大学城北路",
+    "latitude": 39.731320,
+    "longitude": 116.171590
+  }
+}
+```
+
+成功响应：
+
+```json
+{
+  "requestId": "admin-7",
+  "code": 0,
+  "message": "充电站资料已更新",
+  "data": {
+    "stationId": 1,
+    "version": 2,
+    "updatedAt": 1788480000000
+  }
+}
+```
+
+- 可编辑字段只有站名、地址和 WGS-84 经纬度，长度与坐标范围和新增接口一致。
+- `stationId`、`totalCount`、`onlineRate` 不可编辑；桩数和在线率必须由服务端
+  根据设备事实重新聚合。
+- 服务端必须在一个事务中比较 `expectedVersion` 并更新；版本不一致返回 `2102`，
+  客户端提示冲突并重新加载，不自动重放旧修改。
+- 更新站名时，`admin.charger.list` 中的 `stationName` 必须来自最新站点记录，
+  不能在充电桩表中保存一份无法同步的冗余真值。
+- 同名同址的重复站点返回 `1001`。本节点不提供硬删除：存在充电桩、订单或统计
+  记录时删除语义需要成员 A 单独设计，不能由客户端直接级联删除。
+
+## 站内充电桩详情
+
+管理员端复用用户端已经冻结的 action：`station.detail`，不再设计第二套重复接口。
+
+请求：
+
+```json
+{
+  "action": "station.detail",
+  "requestId": "admin-6",
+  "data": { "stationId": 1 }
+}
+```
+
+成功响应：
+
+```json
+{
+  "requestId": "admin-6",
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "stationId": 1,
+    "version": 1,
+    "name": "良乡大学城站",
+    "address": "北京市房山区良乡大学城北路",
+    "latitude": 39.731320,
+    "longitude": 116.171590,
+    "chargers": [
+      {
+        "chargerId": 1001,
+        "chargerCode": "CP-001",
+        "type": 0,
+        "power": 120.0,
+        "status": 0,
+        "pricePerKwh": 1.20
+      }
+    ]
+  }
+}
+```
+
+- `chargers` 必须始终存在；无桩站点返回空数组 `[]`，不返回 `null`。
+- `version` 与站点列表一致；成功编辑后列表和详情都返回递增的新版本。
+- `chargerCode`、`power` 沿用用户端已冻结字段，管理员端不要求服务端为详情再做
+  `code/powerKw` 别名。
+- `type`、`status` 使用本文前述统一整数枚举；`pricePerKwh` 为非负元/度价格。
+- 客户端校验响应 `stationId` 与请求一致，并用选择 generation 忽略迟到详情响应。
+
+## 新增充电站与初始桩
+
+请求 action：`admin.stations.create`
+
+```json
+{
+  "action": "admin.stations.create",
+  "requestId": "admin-7",
+  "data": {
+    "name": "通州智慧能源站",
+    "address": "北京市通州区运河东大街",
+    "latitude": 39.902500,
+    "longitude": 116.656300,
+    "chargerCount": 4
+  }
+}
+```
+
+输入约束：
+
+- `name` 去除首尾空白后为 1～60 个字符。
+- `address` 去除首尾空白后为 1～200 个字符。
+- `latitude`、`longitude` 分别在 -90～90、-180～180 范围内。
+- `chargerCount` 是 0～100 的整数；允许创建尚未投运的无桩站点。
+- 此接口要求管理员登录；无效字段返回 `1001`，会话失效返回 `1003`，内部或
+  事务失败返回 `5000`，具体原因放在 `message`。
+- 服务端拒绝同名同址的重复站点并返回 `1001`；客户端不依赖本地列表做唯一性
+  判断，避免分页或并发情况下漏判。
+
+成功响应：
+
+```json
+{
+  "requestId": "admin-7",
+  "code": 0,
+  "message": "充电站创建成功",
+  "data": {
+    "stationId": 5,
+    "createdChargerCount": 4
+  }
+}
+```
+
+一致性规则：
+
+- 服务端负责生成 `stationId`、初始 `chargerId` 和唯一可展示的桩编号。
+- 初始桩的类型、功率和电价属于服务端配置/种子策略，不由客户端请求指定；Mock
+  中的交替快慢充数据仅用于界面验证，不是数据库实现的业务默认值。
+- 站点和全部初始桩必须在一个数据库事务中创建；任意一步失败整体回滚。
+- 成功时 `createdChargerCount` 必须等于请求的 `chargerCount`，否则客户端将响应
+  视为异常并不刷新为成功状态。
+- 客户端不乐观插入本地行。收到成功响应后重新调用 `admin.stations.list`，再按
+  新 `stationId` 调用 `station.detail`；失败时保留当前列表。
+- 成员 2 的用户端随后通过 `station.nearby`/`station.detail` 查询同一数据库事实，
+  作为真实服务端阶段的跨端验收。
+
 ## 会话规则
 
 - 当前版本不使用 token，服务端在登录成功后把 `adminId` 绑定到该 TCP 连接。
@@ -224,4 +481,6 @@
 | 1003 | 未登录或会话失效 |
 | 1101 | 管理员账号或密码错误 |
 | 2101 | 充电桩正在服务订单，拒绝运维操作 |
+| 2102 | 站点版本冲突，旧资料不得覆盖新版本 |
+| 2103 | 充电桩当前状态与 `expectedStatus` 不一致 |
 | 5000 | 服务端内部错误 |

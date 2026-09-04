@@ -10,6 +10,7 @@
 #include <QComboBox>
 #include <QDialog>
 #include <QFrame>
+#include <QFormLayout>
 #include <QHeaderView>
 #include <QHBoxLayout>
 #include <QItemSelectionModel>
@@ -153,6 +154,100 @@ bool confirmRestart(QWidget* parent, const Charger& charger)
     buttons->addWidget(cancel);
     buttons->addWidget(confirm);
     layout->addLayout(buttons);
+    return dialog.exec() == QDialog::Accepted;
+}
+
+bool promptStatusUpdate(QWidget* parent, const Charger& charger,
+                        ChargerStatusUpdateRequest* request)
+{
+    if (!request || charger.status == protocol::ChargerStatusCharging) {
+        return false;
+    }
+
+    QDialog dialog(parent);
+    dialog.setObjectName(QStringLiteral("operationDialog"));
+    dialog.setWindowTitle(QStringLiteral("调整设备状态"));
+    dialog.setModal(true);
+    dialog.setMinimumWidth(520);
+
+    auto* layout = new QVBoxLayout(&dialog);
+    layout->setContentsMargins(26, 24, 26, 22);
+    layout->setSpacing(13);
+    auto* eyebrow = new QLabel(QStringLiteral("受控运维状态变更"), &dialog);
+    eyebrow->setObjectName(QStringLiteral("dialogEyebrow"));
+    auto* title = new QLabel(QStringLiteral("调整 %1").arg(charger.code), &dialog);
+    title->setObjectName(QStringLiteral("dialogTitle"));
+    auto* description = new QLabel(
+        QStringLiteral("当前状态：%1。提交时服务端会再次校验设备状态和活动订单。")
+            .arg(charger.statusLabel()),
+        &dialog);
+    description->setObjectName(QStringLiteral("dialogText"));
+    description->setWordWrap(true);
+    layout->addWidget(eyebrow);
+    layout->addWidget(title);
+    layout->addWidget(description);
+
+    auto* panel = new QFrame(&dialog);
+    panel->setObjectName(QStringLiteral("dialogPanel"));
+    auto* form = new QFormLayout(panel);
+    form->setContentsMargins(18, 16, 18, 16);
+    form->setSpacing(12);
+    auto* target = new QComboBox(panel);
+    const QList<QPair<QString, int>> allowedTargets = {
+        {QStringLiteral("空闲"), protocol::ChargerStatusIdle},
+        {QStringLiteral("故障"), protocol::ChargerStatusFault},
+        {QStringLiteral("离线"), protocol::ChargerStatusOffline},
+    };
+    for (const auto& option : allowedTargets) {
+        if (option.second != charger.status) {
+            target->addItem(option.first, option.second);
+        }
+    }
+    auto* reason = new QLineEdit(panel);
+    reason->setMaxLength(200);
+    reason->setPlaceholderText(QStringLiteral("必填，例如：设备检修下线"));
+    form->addRow(QStringLiteral("目标状态"), target);
+    form->addRow(QStringLiteral("变更原因"), reason);
+    layout->addWidget(panel);
+
+    auto* warning = new QLabel(
+        QStringLiteral("不能手工设置为“在用”；“在用”只能由预约和充电订单驱动。"),
+        &dialog);
+    warning->setObjectName(QStringLiteral("dialogWarning"));
+    warning->setWordWrap(true);
+    layout->addWidget(warning);
+    auto* error = new QLabel(&dialog);
+    error->setObjectName(QStringLiteral("formError"));
+    error->setWordWrap(true);
+    error->hide();
+    layout->addWidget(error);
+
+    auto* buttons = new QHBoxLayout;
+    buttons->addStretch();
+    auto* cancel = new QPushButton(QStringLiteral("取消"), &dialog);
+    cancel->setObjectName(QStringLiteral("secondaryButton"));
+    auto* submit = new QPushButton(QStringLiteral("确认变更"), &dialog);
+    submit->setObjectName(QStringLiteral("dangerButton"));
+    QObject::connect(cancel, &QPushButton::clicked, &dialog, &QDialog::reject);
+    QObject::connect(submit, &QPushButton::clicked, &dialog, [&] {
+        ChargerStatusUpdateRequest candidate;
+        candidate.chargerId = charger.chargerId;
+        candidate.expectedStatus = charger.status;
+        candidate.targetStatus = target->currentData().toInt();
+        candidate.reason = reason->text();
+        QString validationError;
+        if (!candidate.validate(&validationError)) {
+            error->setText(validationError);
+            error->show();
+            return;
+        }
+        *request = candidate;
+        dialog.accept();
+    });
+    buttons->addWidget(cancel);
+    buttons->addWidget(submit);
+    layout->addLayout(buttons);
+    reason->setFocus();
     return dialog.exec() == QDialog::Accepted;
 }
 
@@ -346,13 +441,20 @@ ChargerManagementPage::ChargerManagementPage(AdminApiClient* api, QWidget* paren
     restartButton_->setEnabled(false);
     connect(restartButton_, &QPushButton::clicked,
             this, &ChargerManagementPage::restartSelectedCharger);
+    statusButton_ = new QPushButton(QStringLiteral("调整状态"), operationBar);
+    statusButton_->setObjectName(QStringLiteral("secondaryButton"));
+    statusButton_->setEnabled(false);
+    connect(statusButton_, &QPushButton::clicked,
+            this, &ChargerManagementPage::changeSelectedChargerStatus);
+    operationLayout->addWidget(statusButton_);
     operationLayout->addWidget(restartButton_);
     rootLayout->addWidget(operationBar);
 }
 
 void ChargerManagementPage::refresh()
 {
-    if (api_->isChargerListInFlight() || api_->isChargerRestartInFlight()) {
+    if (api_->isChargerListInFlight() || api_->isChargerRestartInFlight()
+        || api_->isChargerStatusUpdateInFlight()) {
         return;
     }
 
@@ -385,6 +487,7 @@ void ChargerManagementPage::updateSelection(const QModelIndex& current)
     if (iterator == chargersById_.constEnd()) {
         selectionLabel_->setText(QStringLiteral("请选择一台充电桩"));
         restartButton_->setEnabled(false);
+        statusButton_->setEnabled(false);
         return;
     }
 
@@ -395,13 +498,20 @@ void ChargerManagementPage::updateSelection(const QModelIndex& current)
             .arg(charger.chargerId));
     restartButton_->setEnabled(!api_->isChargerRestartInFlight()
                                && !api_->isChargerListInFlight());
+    const bool orderControlled = charger.status == protocol::ChargerStatusCharging;
+    statusButton_->setEnabled(!api_->isChargerStatusUpdateInFlight()
+                              && !api_->isChargerListInFlight());
+    statusButton_->setToolTip(orderControlled
+        ? QStringLiteral("点击查看在用设备的状态保护规则")
+        : QStringLiteral("在空闲、故障和离线之间执行受控变更"));
 }
 
 void ChargerManagementPage::restartSelectedCharger()
 {
     const qint64 chargerId = selectedChargerId();
     const auto iterator = chargersById_.constFind(chargerId);
-    if (iterator == chargersById_.constEnd() || api_->isChargerRestartInFlight()) {
+    if (iterator == chargersById_.constEnd() || api_->isChargerRestartInFlight()
+        || api_->isChargerStatusUpdateInFlight()) {
         return;
     }
 
@@ -412,6 +522,7 @@ void ChargerManagementPage::restartSelectedCharger()
 
     restartButton_->setEnabled(false);
     restartButton_->setText(QStringLiteral("正在提交…"));
+    statusButton_->setEnabled(false);
     refreshButton_->setEnabled(false);
     const QPointer<ChargerManagementPage> guardedThis(this);
     const bool started = api_->restartCharger(
@@ -422,8 +533,9 @@ void ChargerManagementPage::restartSelectedCharger()
             }
             guardedThis->restartButton_->setText(QStringLiteral("远程重启"));
             if (!ok) {
-                guardedThis->restartButton_->setEnabled(true);
                 guardedThis->refreshButton_->setEnabled(true);
+                guardedThis->updateSelection(
+                    guardedThis->table_->tableView()->currentIndex());
                 showOperationResult(guardedThis, false,
                                     QStringLiteral("重启未执行"), message);
                 return;
@@ -442,6 +554,65 @@ void ChargerManagementPage::restartSelectedCharger()
     }
 }
 
+void ChargerManagementPage::changeSelectedChargerStatus()
+{
+    const qint64 chargerId = selectedChargerId();
+    const auto iterator = chargersById_.constFind(chargerId);
+    if (iterator == chargersById_.constEnd()
+        || api_->isChargerStatusUpdateInFlight()
+        || api_->isChargerRestartInFlight()) {
+        return;
+    }
+
+    const Charger charger = iterator.value();
+    if (charger.status == protocol::ChargerStatusCharging) {
+        showOperationResult(
+            this, false, QStringLiteral("状态由订单流程控制"),
+            QStringLiteral("%1 正在服务预约或充电订单，管理员不能强制修改状态。\n"
+                           "请等待订单正常结束；如设备异常，可先联系服务端负责人核查订单。")
+                .arg(charger.code));
+        return;
+    }
+    ChargerStatusUpdateRequest request;
+    if (!promptStatusUpdate(this, charger, &request)) {
+        return;
+    }
+
+    statusButton_->setEnabled(false);
+    statusButton_->setText(QStringLiteral("正在提交…"));
+    restartButton_->setEnabled(false);
+    refreshButton_->setEnabled(false);
+    const QPointer<ChargerManagementPage> guardedThis(this);
+    const bool started = api_->updateChargerStatus(
+        request,
+        [guardedThis, code = charger.code](
+            std::optional<ChargerStatusUpdateResult> result,
+            const QString& errorMessage) {
+            if (!guardedThis) {
+                return;
+            }
+            guardedThis->statusButton_->setText(QStringLiteral("调整状态"));
+            if (!result) {
+                guardedThis->refreshButton_->setEnabled(true);
+                guardedThis->updateSelection(
+                    guardedThis->table_->tableView()->currentIndex());
+                showOperationResult(guardedThis, false,
+                                    QStringLiteral("状态变更未执行"), errorMessage);
+                return;
+            }
+            showOperationResult(
+                guardedThis, true, QStringLiteral("设备状态已更新"),
+                QStringLiteral("%1 的状态已由服务端确认，列表将重新查询。")
+                    .arg(code));
+            guardedThis->refresh();
+        });
+    if (!started && !api_->isChargerStatusUpdateInFlight()) {
+        statusButton_->setText(QStringLiteral("调整状态"));
+        refreshButton_->setEnabled(true);
+        updateSelection(table_->tableView()->currentIndex());
+    }
+}
+
 void ChargerManagementPage::setLoading(bool loading)
 {
     refreshButton_->setEnabled(!loading);
@@ -456,6 +627,7 @@ void ChargerManagementPage::setLoading(bool loading)
         stateLabel_->setText(QStringLiteral("正在同步服务端设备状态"));
         stateLabel_->setStyleSheet(QStringLiteral("color:#FFC04D;"));
         restartButton_->setEnabled(false);
+        statusButton_->setEnabled(false);
     }
 }
 
@@ -472,6 +644,7 @@ void ChargerManagementPage::showError(const QString& message)
     filterCountLabel_->setText(QStringLiteral("显示 0 / 0 台"));
     selectionLabel_->setText(QStringLiteral("请选择一台充电桩"));
     restartButton_->setEnabled(false);
+    statusButton_->setEnabled(false);
     stateLabel_->setText(message.isEmpty()
         ? QStringLiteral("充电桩列表加载失败") : message);
     stateLabel_->setStyleSheet(QStringLiteral("color:#FF7D87;"));
@@ -579,6 +752,7 @@ void ChargerManagementPage::applyFilters()
     }
     selectionLabel_->setText(QStringLiteral("请选择一台充电桩"));
     restartButton_->setEnabled(false);
+    statusButton_->setEnabled(false);
     filterCountLabel_->setText(QStringLiteral("显示 %1 / %2 台")
                                    .arg(rows.size())
                                    .arg(allChargers_.size()));

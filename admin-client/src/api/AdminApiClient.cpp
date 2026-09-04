@@ -119,7 +119,8 @@ bool AdminApiClient::isChargerOverviewInFlight() const
 
 bool AdminApiClient::requestChargers(ChargerListCallback callback)
 {
-    if (chargerListInFlight_ || chargerRestartInFlight_) {
+    if (chargerListInFlight_ || chargerRestartInFlight_
+        || chargerStatusUpdateInFlight_) {
         return false;
     }
 
@@ -170,7 +171,8 @@ bool AdminApiClient::isChargerListInFlight() const
 
 bool AdminApiClient::restartCharger(qint64 chargerId, OperationCallback callback)
 {
-    if (chargerRestartInFlight_ || chargerListInFlight_ || chargerId <= 0) {
+    if (chargerRestartInFlight_ || chargerStatusUpdateInFlight_
+        || chargerListInFlight_ || chargerId <= 0) {
         return false;
     }
 
@@ -214,6 +216,286 @@ bool AdminApiClient::restartCharger(qint64 chargerId, OperationCallback callback
 bool AdminApiClient::isChargerRestartInFlight() const
 {
     return chargerRestartInFlight_;
+}
+
+bool AdminApiClient::requestStations(StationListCallback callback)
+{
+    if (stationListInFlight_ || stationCreateInFlight_ || stationUpdateInFlight_
+        || chargerStatusUpdateInFlight_) {
+        return false;
+    }
+
+    stationListInFlight_ = true;
+    sendAuthenticated(
+        QString::fromUtf8(protocol::action::kAdminStationList), {},
+        [this, callback = std::move(callback)](const protocol::Response& response) {
+            stationListInFlight_ = false;
+            if (!response.isOk()) {
+                if (callback) {
+                    callback(std::nullopt,
+                             protocol::describeError(response.code, response.message));
+                }
+                return;
+            }
+
+            const QJsonValue stationsValue =
+                response.data.value(QStringLiteral("stations"));
+            if (!stationsValue.isArray()) {
+                if (callback) {
+                    callback(std::nullopt,
+                             QStringLiteral("充电站列表响应缺少 stations 数组"));
+                }
+                return;
+            }
+
+            QList<Station> stations;
+            QString parseError;
+            if (!Station::listFromJson(stationsValue.toArray(),
+                                       &stations, &parseError)) {
+                if (callback) {
+                    callback(std::nullopt,
+                             QStringLiteral("充电站列表数据异常：%1").arg(parseError));
+                }
+                return;
+            }
+            if (callback) {
+                callback(stations, {});
+            }
+        });
+    return true;
+}
+
+bool AdminApiClient::isStationListInFlight() const
+{
+    return stationListInFlight_;
+}
+
+bool AdminApiClient::requestStationDetail(qint64 stationId,
+                                          StationDetailCallback callback)
+{
+    if (stationId <= 0) {
+        return false;
+    }
+
+    ++stationDetailInFlightCount_;
+    QJsonObject data;
+    data.insert(QStringLiteral("stationId"), stationId);
+    sendAuthenticated(
+        QString::fromUtf8(protocol::action::kStationDetail), data,
+        [this, stationId, callback = std::move(callback)](
+            const protocol::Response& response) {
+            stationDetailInFlightCount_ = qMax(0, stationDetailInFlightCount_ - 1);
+            if (!response.isOk()) {
+                if (callback) {
+                    callback(std::nullopt,
+                             protocol::describeError(response.code, response.message));
+                }
+                return;
+            }
+
+            StationDetail detail;
+            QString parseError;
+            if (!StationDetail::fromJson(response.data, &detail, &parseError)) {
+                if (callback) {
+                    callback(std::nullopt,
+                             QStringLiteral("站内详情数据异常：%1").arg(parseError));
+                }
+                return;
+            }
+            if (detail.stationId != stationId) {
+                if (callback) {
+                    callback(std::nullopt,
+                             QStringLiteral("站内详情返回了不匹配的站点 ID"));
+                }
+                return;
+            }
+            if (callback) {
+                callback(detail, {});
+            }
+        });
+    return true;
+}
+
+bool AdminApiClient::isStationDetailInFlight() const
+{
+    return stationDetailInFlightCount_ > 0;
+}
+
+bool AdminApiClient::createStation(const StationCreateRequest& request,
+                                   StationCreateCallback callback)
+{
+    if (stationCreateInFlight_ || stationUpdateInFlight_ || stationListInFlight_) {
+        return false;
+    }
+
+    QString validationError;
+    if (!request.validate(&validationError)) {
+        if (callback) {
+            callback(std::nullopt, validationError);
+        }
+        return false;
+    }
+
+    stationCreateInFlight_ = true;
+    sendAuthenticated(
+        QString::fromUtf8(protocol::action::kAdminStationCreate), request.toJson(),
+        [this, expectedCount = request.chargerCount,
+         callback = std::move(callback)](const protocol::Response& response) {
+            stationCreateInFlight_ = false;
+            if (!response.isOk()) {
+                if (callback) {
+                    callback(std::nullopt,
+                             protocol::describeError(response.code, response.message));
+                }
+                return;
+            }
+
+            StationCreateResult result;
+            QString parseError;
+            if (!StationCreateResult::fromJson(response.data, &result, &parseError)) {
+                if (callback) {
+                    callback(std::nullopt,
+                             QStringLiteral("新增站点响应异常：%1").arg(parseError));
+                }
+                return;
+            }
+            if (result.createdChargerCount != expectedCount) {
+                if (callback) {
+                    callback(std::nullopt,
+                             QStringLiteral("服务端创建的初始电桩数量与请求不一致"));
+                }
+                return;
+            }
+            if (callback) {
+                callback(result, {});
+            }
+        });
+    return true;
+}
+
+bool AdminApiClient::isStationCreateInFlight() const
+{
+    return stationCreateInFlight_;
+}
+
+bool AdminApiClient::updateStation(const StationUpdateRequest& request,
+                                   StationUpdateCallback callback)
+{
+    if (stationUpdateInFlight_ || stationCreateInFlight_ || stationListInFlight_) {
+        return false;
+    }
+
+    QString validationError;
+    if (!request.validate(&validationError)) {
+        if (callback) {
+            callback(std::nullopt, validationError);
+        }
+        return false;
+    }
+
+    stationUpdateInFlight_ = true;
+    sendAuthenticated(
+        QString::fromUtf8(protocol::action::kAdminStationUpdate), request.toJson(),
+        [this, expectedId = request.stationId,
+         callback = std::move(callback)](const protocol::Response& response) {
+            stationUpdateInFlight_ = false;
+            if (!response.isOk()) {
+                if (callback) {
+                    callback(std::nullopt,
+                             protocol::describeError(response.code, response.message));
+                }
+                return;
+            }
+
+            StationUpdateResult result;
+            QString parseError;
+            if (!StationUpdateResult::fromJson(response.data, &result, &parseError)) {
+                if (callback) {
+                    callback(std::nullopt,
+                             QStringLiteral("编辑站点响应异常：%1").arg(parseError));
+                }
+                return;
+            }
+            if (result.stationId != expectedId) {
+                if (callback) {
+                    callback(std::nullopt, QStringLiteral("编辑站点响应中的 ID 不匹配"));
+                }
+                return;
+            }
+            if (callback) {
+                callback(result, {});
+            }
+        });
+    return true;
+}
+
+bool AdminApiClient::isStationUpdateInFlight() const
+{
+    return stationUpdateInFlight_;
+}
+
+bool AdminApiClient::updateChargerStatus(
+    const ChargerStatusUpdateRequest& request,
+    ChargerStatusUpdateCallback callback)
+{
+    if (chargerStatusUpdateInFlight_ || chargerRestartInFlight_
+        || chargerListInFlight_) {
+        return false;
+    }
+
+    QString validationError;
+    if (!request.validate(&validationError)) {
+        if (callback) {
+            callback(std::nullopt, validationError);
+        }
+        return false;
+    }
+
+    chargerStatusUpdateInFlight_ = true;
+    sendAuthenticated(
+        QString::fromUtf8(protocol::action::kAdminChargerStatusUpdate),
+        request.toJson(),
+        [this, expectedId = request.chargerId,
+         expectedPrevious = request.expectedStatus,
+         expectedTarget = request.targetStatus,
+         callback = std::move(callback)](const protocol::Response& response) {
+            chargerStatusUpdateInFlight_ = false;
+            if (!response.isOk()) {
+                if (callback) {
+                    callback(std::nullopt,
+                             protocol::describeError(response.code, response.message));
+                }
+                return;
+            }
+
+            ChargerStatusUpdateResult result;
+            QString parseError;
+            if (!ChargerStatusUpdateResult::fromJson(
+                    response.data, &result, &parseError)) {
+                if (callback) {
+                    callback(std::nullopt,
+                             QStringLiteral("状态变更响应异常：%1").arg(parseError));
+                }
+                return;
+            }
+            if (result.chargerId != expectedId
+                || result.previousStatus != expectedPrevious
+                || result.status != expectedTarget) {
+                if (callback) {
+                    callback(std::nullopt, QStringLiteral("状态变更响应与请求不匹配"));
+                }
+                return;
+            }
+            if (callback) {
+                callback(result, {});
+            }
+        });
+    return true;
+}
+
+bool AdminApiClient::isChargerStatusUpdateInFlight() const
+{
+    return chargerStatusUpdateInFlight_;
 }
 
 QString AdminApiClient::sendAuthenticated(const QString& action,

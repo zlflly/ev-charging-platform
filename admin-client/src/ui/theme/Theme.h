@@ -139,7 +139,7 @@ inline QString globalStyleSheet()
             color:#FFFFFF; background:#492029; border-color:#FF6268;
         }
         QPushButton:disabled { color:#5E7182; background:#101A25; border-color:#223243; }
-        QLineEdit, QComboBox {
+        QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {
             color: #F4F8FC;
             background: #0B1B2A;
             border: 1px solid #24425E;
@@ -147,7 +147,15 @@ inline QString globalStyleSheet()
             min-height: 38px;
             padding: 0 12px;
         }
-        QLineEdit:focus, QComboBox:focus { border-color: #48C8FF; }
+        QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
+            border-color: #48C8FF;
+        }
+        QSpinBox::up-button, QSpinBox::down-button,
+        QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
+            width: 22px;
+            background: #10263A;
+            border: 0;
+        }
         QComboBox::drop-down { border: 0; width: 24px; }
         QComboBox QAbstractItemView {
             color: #E8F3FC;
@@ -182,6 +190,10 @@ inline QString globalStyleSheet()
         QScrollBar:horizontal { height: 8px; background: transparent; }
         QScrollBar::handle:horizontal { min-width: 28px; border-radius: 4px; background: #24425E; }
         QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
+        QSplitter#stationSplitter::handle {
+            height: 8px;
+            background: transparent;
+        }
         QDialog#operationDialog {
             background: #081421;
             color: #F4F8FC;
@@ -205,6 +217,13 @@ inline QString globalStyleSheet()
             border:1px solid #735F2E;
             border-radius:9px;
             padding:10px 12px;
+        }
+        QLabel#formError {
+            color:#FF8B92;
+            background:#31171E;
+            border:1px solid #7A303B;
+            border-radius:9px;
+            padding:9px 12px;
         }
         QLabel#dialogStatus {
             min-width:52px; min-height:52px; max-width:52px; max-height:52px;

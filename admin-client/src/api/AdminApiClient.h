@@ -2,6 +2,7 @@
 
 #include "model/ChargerStatusOverview.h"
 #include "model/Charger.h"
+#include "model/Station.h"
 #include "net/NetworkClient.h"
 
 #include <QJsonObject>
@@ -27,6 +28,21 @@ public:
         std::optional<QList<Charger>> chargers,
         const QString& errorMessage)>;
     using OperationCallback = std::function<void(bool ok, const QString& message)>;
+    using StationListCallback = std::function<void(
+        std::optional<QList<Station>> stations,
+        const QString& errorMessage)>;
+    using StationDetailCallback = std::function<void(
+        std::optional<StationDetail> detail,
+        const QString& errorMessage)>;
+    using StationCreateCallback = std::function<void(
+        std::optional<StationCreateResult> result,
+        const QString& errorMessage)>;
+    using StationUpdateCallback = std::function<void(
+        std::optional<StationUpdateResult> result,
+        const QString& errorMessage)>;
+    using ChargerStatusUpdateCallback = std::function<void(
+        std::optional<ChargerStatusUpdateResult> result,
+        const QString& errorMessage)>;
 
     explicit AdminApiClient(NetworkClient* network,
                             AdminSession* session,
@@ -41,6 +57,19 @@ public:
     bool isChargerListInFlight() const;
     bool restartCharger(qint64 chargerId, OperationCallback callback);
     bool isChargerRestartInFlight() const;
+    bool requestStations(StationListCallback callback);
+    bool isStationListInFlight() const;
+    bool requestStationDetail(qint64 stationId, StationDetailCallback callback);
+    bool isStationDetailInFlight() const;
+    bool createStation(const StationCreateRequest& request,
+                       StationCreateCallback callback);
+    bool isStationCreateInFlight() const;
+    bool updateStation(const StationUpdateRequest& request,
+                       StationUpdateCallback callback);
+    bool isStationUpdateInFlight() const;
+    bool updateChargerStatus(const ChargerStatusUpdateRequest& request,
+                             ChargerStatusUpdateCallback callback);
+    bool isChargerStatusUpdateInFlight() const;
 
     QString sendAuthenticated(const QString& action,
                               const QJsonObject& data,
@@ -63,6 +92,11 @@ private:
     bool chargerOverviewInFlight_ = false;
     bool chargerListInFlight_ = false;
     bool chargerRestartInFlight_ = false;
+    bool stationListInFlight_ = false;
+    int stationDetailInFlightCount_ = 0;
+    bool stationCreateInFlight_ = false;
+    bool stationUpdateInFlight_ = false;
+    bool chargerStatusUpdateInFlight_ = false;
     QString pendingAccount_;
     QString pendingPassword_;
 };
