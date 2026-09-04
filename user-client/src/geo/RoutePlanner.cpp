@@ -112,7 +112,7 @@ void RoutePlanner::plan(double originLatitude, double originLongitude,
     const QByteArray apiKey = readAmapApiKey();
     if (apiKey.isEmpty()) {
         emit error(QStringLiteral(
-            "高德地图 API key 未配置，请设置 AMAP_WEB_SERVICE_KEY 后重试。"));
+            "路线服务尚未配置，请联系管理员。"));
         return;
     }
 

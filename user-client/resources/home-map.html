@@ -1,67 +1,57 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>附近地图</title>
-<style>
-  html, body { margin: 0; padding: 0; height: 100%; background: #0a0f1d; overflow: hidden; }
-  #mapContainer { position: absolute; inset: 0; }
-  .amap-logo, .amap-copyright { opacity: 0.35 !important; }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <style>
+    html, body, #map { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #e9efed; }
+    .amap-logo, .amap-copyright { opacity: .55; }
+    .station-node { width: 18px; height: 18px; border: 4px solid white; border-radius: 50%; background: #149b68; box-shadow: 0 3px 10px rgba(20,36,58,.18); }
+    .station-node.busy { background: #b66b08; }
+  </style>
+  <script>window._AMapSecurityConfig = { securityJsCode: '__AMAP_SECRET__' };</script>
+  <script src="https://webapi.amap.com/maps?v=2.0&key=__AMAP_KEY__"></script>
 </head>
 <body>
-<div id="mapContainer"></div>
+<div id="map"></div>
 <script>
-  window._AMapSecurityConfig = { securityJsCode: "__JS_API_SECRET__" };
-  var mapCenter = { longitude: __CENTER_LNG__, latitude: __CENTER_LAT__ };
+  const map = new AMap.Map('map', {
+    zoom: 13,
+    center: [116.171271, 39.735678],
+    viewMode: '2D',
+    mapStyle: 'amap://styles/normal',
+    showLabel: true
+  });
+  let stationMarkers = [];
+  let routeLine = null;
 
-  function loadScript(src, onload, onerror) {
-    var script = document.createElement("script");
-    script.src = src;
-    script.onload = onload;
-    script.onerror = onerror;
-    document.head.appendChild(script);
-  }
+  window.setCenter = (lat, lng) => {
+    map.setZoomAndCenter(14, [Number(lng), Number(lat)], false, 300);
+  };
 
-  function initMap() {
-    if (typeof AMap === "undefined") return;
-    var map = new AMap.Map("mapContainer", {
-      zoom: 13,
-      center: [mapCenter.longitude, mapCenter.latitude],
-      viewMode: "2D",
-      mapStyle: "amap://styles/darkblue",
-      features: ["bg", "road", "building", "point"]
+  window.setStations = (items) => {
+    map.remove(stationMarkers);
+    stationMarkers = (items || []).map((item) => {
+      const marker = new AMap.Marker({
+        position: [item.longitude, item.latitude],
+        title: item.name,
+        content: `<div class="station-node ${item.available > 0 ? '' : 'busy'}"></div>`,
+        offset: new AMap.Pixel(-13, -13)
+      });
+      marker.setMap(map);
+      return marker;
     });
-    var marker = new AMap.Marker({
-      position: [mapCenter.longitude, mapCenter.latitude],
-      anchor: "bottom-center",
-      content: '<div style="width:18px;height:18px;border-radius:50% 50% 50% 4px;' +
-        'background:#1E8CFF;border:2px solid #fff;transform:rotate(45deg);' +
-        'box-shadow:0 0 0 8px rgba(30,140,255,0.22),0 6px 16px rgba(0,0,0,0.45);"></div>'
-    });
-    map.add(marker);
-    map.on("complete", function () {
-      map.setFitView([marker], false, [40, 40, 40, 40], 14);
-    });
-    window.__homeMap = map;
-    window.__homeMarker = marker;
-    window.setHomeCenter = function (lng, lat) {
-      var position = [lng, lat];
-      marker.setPosition(position);
-      map.setZoomAndCenter(13, position);
-    };
-  }
+    if (stationMarkers.length) map.setFitView(stationMarkers, false, [42,42,42,42], 15);
+  };
 
-  loadScript(
-    "https://webapi.amap.com/maps?v=2.0&key=__JS_API_KEY__",
-    initMap,
-    function () {
-      document.body.innerHTML =
-        '<div style="color:#9BB1C9;font:14px sans-serif;padding:24px;text-align:center;">' +
-        "地图加载失败，请检查网络或 AMAP_JS_API_KEY</div>";
-    }
-  );
+  window.setRoute = (points) => {
+    if (routeLine) map.remove(routeLine);
+    const path = (points || []).map((p) => [p.lng, p.lat]);
+    if (!path.length) return;
+    routeLine = new AMap.Polyline({ path, strokeColor: '#176CFF', strokeWeight: 7, strokeOpacity: .95, lineJoin: 'round' });
+    map.add(routeLine);
+    map.setFitView([routeLine], false, [52,34,52,34], 16);
+  };
 </script>
 </body>
 </html>

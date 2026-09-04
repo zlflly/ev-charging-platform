@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-04T00:00:00+08:00",
+  "title": "Design System: 东软充电移动端",
+  "extensions": {
+    "colorMeta": {
+      "route-blue": {"role":"primary","displayName":"线路蓝","canonical":"#176CFF","tonalRamp":["#06265F","#0B3F99","#1058D2","#176CFF","#5A98FF","#95BCFF","#C7DBFF","#EAF1FF"]},
+      "live-green": {"role":"secondary","displayName":"通电绿","canonical":"#149B68","tonalRamp":["#062E22","#0A4C36","#0F6C4B","#149B68","#4DB58A","#82CFAC","#BCE6D2","#E5F6EE"]},
+      "mineral-canvas": {"role":"neutral","displayName":"矿物画布","canonical":"#F4F7F6","tonalRamp":["#1B2321","#35403D","#52605C","#74817D","#9AA5A1","#C1C9C6","#E0E5E3","#F4F7F6"]},
+      "ink-blue": {"role":"neutral","displayName":"墨蓝","canonical":"#14243A","tonalRamp":["#14243A","#263A53","#3D526C","#5A6F88","#7C8EA2","#A4B2C0","#CDD6DE","#EFF3F6"]}
+    },
+    "typographyMeta": {
+      "display": {"displayName":"页面标题","purpose":"每个视图唯一的最高层级标题。"},
+      "body": {"displayName":"操作正文","purpose":"表单、说明与主要操作文案。"}
+    },
+    "shadows": [],
+    "motion": [
+      {"name":"direct-state","value":"immediate native state change","purpose":"服务端确认后立即切换标签、读数与按钮。"}
+    ],
+    "breakpoints": [
+      {"name":"phone-min","value":"390px"},
+      {"name":"phone-base","value":"430px"},
+      {"name":"phone-max","value":"520px"}
+    ]
+  },
+  "components": [
+    {"name":"Primary Button","kind":"button","refersTo":"button-primary","description":"当前页面唯一主操作。","html":"<button class=\"ds-btn-primary\">开始充电</button>","css":".ds-btn-primary{background:#176CFF;color:#fff;border:0;border-radius:14px;height:50px;padding:0 18px;font:650 15px sans-serif}.ds-btn-primary:hover{background:#0F5FE9}.ds-btn-primary:focus-visible{outline:2px solid #14243A;outline-offset:2px}.ds-btn-primary:active{background:#0B4FCA}"},
+    {"name":"Secondary Button","kind":"button","refersTo":"button-secondary","description":"查看、保存和规划等次级动作。","html":"<button class=\"ds-btn-secondary\">规划路线</button>","css":".ds-btn-secondary{background:#EAF1FF;color:#1558C7;border:0;border-radius:14px;height:50px;padding:0 18px;font:650 15px sans-serif}.ds-btn-secondary:hover{background:#DDE9FF}.ds-btn-secondary:focus-visible{outline:2px solid #176CFF;outline-offset:2px}"},
+    {"name":"Location Input","kind":"input","refersTo":"input","description":"位置、手机号与金额输入的统一字段。","html":"<input class=\"ds-input\" placeholder=\"输入城市、区域或详细地址\">","css":".ds-input{background:#fff;color:#14243A;border:1px solid #DCE5E8;border-radius:14px;height:50px;padding:0 15px;font:400 15px sans-serif}.ds-input:focus{border:2px solid #176CFF;padding:0 14px;outline:0}"},
+    {"name":"Status Chip","kind":"chip","description":"服务端状态的文字与颜色双重编码。","html":"<span class=\"ds-status\">充电中</span>","css":".ds-status{display:inline-flex;background:#E5F6EE;color:#147D59;border-radius:9px;padding:3px 8px;font:650 12px sans-serif}"},
+    {"name":"Bottom Navigation","kind":"nav","description":"四项拇指区导航，选中项以浅蓝托底。","html":"<nav class=\"ds-nav\"><span class=\"ds-nav-active\">首页</span><span>充电</span><span>订单</span><span>我的</span></nav>","css":".ds-nav{display:grid;grid-template-columns:repeat(4,1fr);background:#fff;border-top:1px solid #DCE5E8;color:#647487;font:400 12px sans-serif;text-align:center;padding:12px 8px}.ds-nav-active{color:#176CFF;font-weight:650}.ds-nav:focus-within{border-top-color:#176CFF}"},
+    {"name":"Route Summary","kind":"custom","description":"导航地图底部的终点、时间和距离摘要。","html":"<section class=\"ds-route\"><strong>北理良乡南门充电站 · A-001</strong><div><b>8 分钟</b><span>2.4 km</span></div><button>开始导航</button></section>","css":".ds-route{background:#fff;color:#14243A;border-radius:16px;padding:18px 20px;font:400 14px sans-serif}.ds-route div{display:flex;justify-content:space-between;align-items:end;margin:12px 0}.ds-route b{font-size:32px}.ds-route button{width:100%;height:50px;border:0;border-radius:14px;background:#176CFF;color:#fff;font-weight:650}.ds-route button:focus-visible{outline:2px solid #14243A;outline-offset:2px}"}
+  ],
+  "narrative": {
+    "northStar": "城市能源线路图",
+    "overview": "界面像一张正在运行的城市交通图：浅色底板安静承载，蓝色线路引导动作，绿色节点只在服务端确认可用或充电成功时出现。",
+    "keyCharacteristics": ["冷静的矿物浅灰画布与纸白信息面。","一条蓝色动作线路贯穿定位、找站、充电和导航状态。","业务状态色保持稀缺且语义稳定。","底部导航与主操作保持拇指可达。"],
+    "rules": [
+      {"name":"Signal Color","body":"绿、琥珀和红只表达业务状态，不用于普通装饰。","section":"colors"},
+      {"name":"Flat Route","body":"静态表面保持平整；不要同时给容器添加边框和阴影。","section":"elevation"}
+    ],
+    "dos": ["Do 让每个写操作在服务端确认后才切换状态色和按钮文案。","Do 保持 44px 以上的触控目标和底部拇指区主操作。"],
+    "donts": ["Don't 用假站点、假订单或假进度填满空状态。","Don't 使用渐变文字、玻璃拟态、彩色光晕或无意义阴影。","Don't 用 emoji 或 Unicode 字符替代正式图标。"]
+  }
+}

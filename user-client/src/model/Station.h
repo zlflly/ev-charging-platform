@@ -15,6 +15,8 @@ struct StationInfo {
     int totalChargers = 0;
     int availableChargers = 0;
     double distanceKm = 0.0;
+    double latitude = 0.0;
+    double longitude = 0.0;
 
     bool valid() const { return stationId > 0; }
 
@@ -29,6 +31,8 @@ struct StationInfo {
         station.availableChargers =
             json.value(QStringLiteral("availableChargers")).toInt();
         station.distanceKm = json.value(QStringLiteral("distanceKm")).toDouble();
+        station.latitude = json.value(QStringLiteral("latitude")).toDouble();
+        station.longitude = json.value(QStringLiteral("longitude")).toDouble();
         return station;
     }
 
