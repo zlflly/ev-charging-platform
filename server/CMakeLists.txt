@@ -46,6 +46,8 @@ qt_add_executable(ev-server
     src/service/UserService.cpp
     src/service/StationService.h
     src/service/StationService.cpp
+    src/service/OrderService.h
+    src/service/OrderService.cpp
 )
 
 target_include_directories(ev-server PRIVATE src)

@@ -16,6 +16,7 @@
 #include "protocol/Protocol.h"
 #include "service/UserService.h"
 #include "service/StationService.h"
+#include "service/OrderService.h"
 
 namespace net {
 
@@ -29,6 +30,7 @@ public:
         : QObject(parent)
         , m_userService(new service::UserService(this))
         , m_stationService(new service::StationService(this))
+        , m_orderService(new service::OrderService(this))
     {
         // 公共接口
         registerHandler(protocol::action::kPing, &RequestDispatcher::handlePing);
@@ -42,8 +44,16 @@ public:
         registerHandler(protocol::action::kStationNearby, &RequestDispatcher::handleStationNearby);
         registerHandler(protocol::action::kStationDetail, &RequestDispatcher::handleStationDetail);
 
+        // 订单接口（Commit 5）
+        registerHandler(protocol::action::kOrderActive, &RequestDispatcher::handleOrderActive);
+        registerHandler(protocol::action::kOrderReserve, &RequestDispatcher::handleOrderReserve);
+        registerHandler(protocol::action::kOrderStart, &RequestDispatcher::handleOrderStart);
+        registerHandler(protocol::action::kOrderStatus, &RequestDispatcher::handleOrderStatus);
+        registerHandler(protocol::action::kOrderStop, &RequestDispatcher::handleOrderStop);
+        registerHandler(protocol::action::kOrderSettle, &RequestDispatcher::handleOrderSettle);
+        registerHandler(protocol::action::kOrderHistory, &RequestDispatcher::handleOrderHistory);
+
         // 后续 Commit 补充：
-        // Commit 5: order.* (reserve/start/stop/settle/history/active/status)
         // Commit 6: admin.*
     }
 
@@ -159,10 +169,55 @@ private:
         connection->sendResponse(protocol::buildResponse(request.requestId, response));
     }
 
+    // Commit 5: 订单接口
+
+    void handleOrderActive(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_orderService->handleActive(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleOrderReserve(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_orderService->handleReserve(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleOrderStart(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_orderService->handleStart(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleOrderStatus(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_orderService->handleStatus(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleOrderStop(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_orderService->handleStop(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleOrderSettle(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_orderService->handleSettle(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleOrderHistory(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_orderService->handleHistory(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
 private:
     QHash<QString, Handler> m_handlers;
     service::UserService* m_userService;
     service::StationService* m_stationService;
+    service::OrderService* m_orderService;
 };
 
 } // namespace net
