@@ -164,13 +164,12 @@ private:
     QLineEdit* addressInput_ = nullptr;
     QPushButton* locateButton_ = nullptr;
     QLabel* homeNotice_ = nullptr;
-    QLabel* homeRouteSummary_ = nullptr;
+    QLabel* stationCountLabel_ = nullptr;
     AmapWidget* mapWidget_ = nullptr;
     QWidget* stationListBody_ = nullptr;
     QVBoxLayout* stationListLayout_ = nullptr;
     QList<StationInfo> nearbyStations_;
     int homeFilter_ = 0;
-    qint64 nearestStationId_ = 0;
     bool navigateAfterDetail_ = false;
 
     QLabel* detailName_ = nullptr;

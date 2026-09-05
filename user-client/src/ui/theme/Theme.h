@@ -25,6 +25,20 @@ inline QString globalStyleSheet()
         QMainWindow, QWidget#AppRoot, QWidget#Page { background: #F4F7F6; }
         QLabel { background: transparent; }
         QLabel#PageTitle { font-size: 28px; font-weight: 700; }
+        QLabel#HomeTitle { font-size: 26px; font-weight: 750; color: #102744; }
+        QLabel#HomeLocation { color: #43566E; font-size: 13px; }
+        QLabel#HomeSectionTitle { font-size: 18px; font-weight: 700; color: #102744; }
+        QLabel#HomeSectionCount { color: #647487; font-size: 12px; }
+        QLabel#StationName { color: #102744; font-size: 15px; font-weight: 700; }
+        QLabel#StationDistance { color: #2E4562; font-size: 14px; font-weight: 700; }
+        QLabel#StationEta { color: #718198; font-size: 11px; }
+        QLabel#StationCaption { color: #7A889B; font-size: 10px; }
+        QLabel#StationPrice { color: #102744; font-size: 18px; font-weight: 750; }
+        QLabel#StationAvailable { color: #149B68; font-size: 20px; font-weight: 750; }
+        QLabel#StationUnavailable { color: #D84C4C; font-size: 20px; font-weight: 750; }
+        QLabel#StationTag { color: #43566E; background: #F1F5FA; border-radius: 6px; padding: 2px 5px; font-size: 10px; }
+        QLabel#StationTagBlue { color: #176CFF; background: #EAF1FF; border-radius: 6px; padding: 2px 5px; font-size: 10px; }
+        QLabel#StationTagAmber { color: #B66B08; background: #FFF2D8; border-radius: 6px; padding: 2px 5px; font-size: 10px; }
         QLabel#SectionTitle { font-size: 19px; font-weight: 650; }
         QLabel#Muted { color: #647487; font-size: 13px; }
         QLabel#Metric { font-size: 40px; font-weight: 750; }
@@ -42,6 +56,7 @@ inline QString globalStyleSheet()
         QFrame#NavigationHandle { background: #B9C8D2; border-radius: 2px; min-height: 4px; max-height: 4px; }
         QFrame#Divider { background: #DCE5E8; min-height: 1px; max-height: 1px; }
         QFrame#VerticalDivider { background: #DCE5E8; min-width: 1px; max-width: 1px; }
+        QFrame#HomeSearchShell { background: #FFFFFF; border: 1px solid #DCE5E8; border-radius: 14px; }
         QLabel#NavigationHeader { font-size: 20px; font-weight: 700; }
         QLabel#NavigationStepLead { color: #43566E; font-size: 14px; }
         QLabel#NavigationRoad { color: #14243A; font-size: 20px; font-weight: 700; }
@@ -67,6 +82,17 @@ inline QString globalStyleSheet()
         QPushButton#Danger { background: #FDEAEA; color: #B83C3C; }
         QPushButton#NavigationSecondary { background: #FFFFFF; color: #176CFF; border: 1px solid #176CFF; }
         QPushButton#NavigationSecondary:hover { background: #EAF1FF; }
+        QPushButton#HomeRefresh { background: #FFFFFF; color: #176CFF; border: 1px solid #E3E9F0; border-radius: 13px; min-height: 40px; padding: 0 10px; font-size: 12px; }
+        QPushButton#HomeRefresh:hover { background: #F4F8FF; border-color: #BFD2FF; }
+        QPushButton#HomeFilter { background: #FFFFFF; color: #61738B; border: 1px solid #E2E8EF; border-radius: 9px; min-height: 28px; padding: 0 4px; font-size: 11px; }
+        QPushButton#HomeFilter:hover { background: #F7FAFE; border-color: #C8D7E8; }
+        QPushButton#HomeFilter:checked { background: #F1F6FF; color: #176CFF; border: 1px solid #AFC9FF; font-weight: 650; }
+        QPushButton#HomeLocate { background: #F5F8FE; color: #176CFF; border: 1px solid #D4DFEF; border-radius: 14px; min-height: 50px; padding: 0 13px; font-size: 14px; }
+        QPushButton#HomeLocate:hover { background: #EAF1FF; border-color: #AFC9FF; }
+        QPushButton#StationNavigate { background: #176CFF; color: #FFFFFF; border-radius: 9px; min-height: 30px; padding: 0 8px; font-size: 12px; }
+        QPushButton#StationNavigate:hover { background: #0F5FE9; }
+        QPushButton#StationDetail { background: #FFFFFF; color: #176CFF; border: 1px solid #AFC9FF; border-radius: 9px; min-height: 28px; padding: 0 8px; font-size: 12px; }
+        QPushButton#StationDetail:hover { background: #F1F6FF; }
         QScrollArea { border: none; background: transparent; }
         QScrollArea > QWidget > QWidget { background: transparent; }
         QScrollBar:vertical { background: transparent; width: 6px; margin: 2px; }

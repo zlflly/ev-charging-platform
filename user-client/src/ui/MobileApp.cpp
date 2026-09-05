@@ -26,6 +26,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 #include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
+#include <QIcon>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -33,6 +34,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 #include <QLineEdit>
 #include <QPainter>
 #include <QPainterPath>
+#include <QPixmap>
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QScrollArea>
@@ -63,6 +65,129 @@ QPushButton* button(const QString& text, const char* name = "Primary")
     result->setCursor(Qt::PointingHandCursor);
     return result;
 }
+
+enum class HomeIcon { Refresh, Bolt, SlowBolt, Star, Target, Search, Locate, Navigation, Chevron, Pin };
+
+QIcon homeIcon(HomeIcon kind, const QColor& color)
+{
+    QPixmap pixmap(40, 40);
+    pixmap.fill(Qt::transparent);
+    pixmap.setDevicePixelRatio(2.0);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(QPen(color, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(Qt::NoBrush);
+
+    if (kind == HomeIcon::Refresh) {
+        painter.drawArc(QRectF(3.5, 3.5, 13, 13), 36 * 16, 245 * 16);
+        painter.drawLine(QPointF(15.8, 3.4), QPointF(16.5, 7.4));
+        painter.drawLine(QPointF(15.8, 3.4), QPointF(12.0, 4.5));
+        painter.drawArc(QRectF(3.5, 3.5, 13, 13), 216 * 16, 82 * 16);
+        painter.drawLine(QPointF(4.2, 16.7), QPointF(3.5, 12.8));
+        painter.drawLine(QPointF(4.2, 16.7), QPointF(8.0, 15.4));
+    } else if (kind == HomeIcon::Bolt || kind == HomeIcon::SlowBolt) {
+        QPainterPath path;
+        path.moveTo(11.2, 1.8); path.lineTo(4.4, 11.0); path.lineTo(9.2, 11.0);
+        path.lineTo(7.5, 18.2); path.lineTo(15.7, 8.0); path.lineTo(10.7, 8.0);
+        path.closeSubpath();
+        painter.drawPath(path);
+        if (kind == HomeIcon::SlowBolt) {
+            painter.setPen(QPen(color, 1.4, Qt::SolidLine, Qt::RoundCap));
+            painter.drawLine(QPointF(2.2, 5.0), QPointF(4.7, 5.0));
+            painter.drawLine(QPointF(1.2, 8.2), QPointF(3.6, 8.2));
+        }
+    } else if (kind == HomeIcon::Star) {
+        QPainterPath star;
+        for (int index = 0; index < 10; ++index) {
+            const double radius = index % 2 == 0 ? 8.0 : 3.5;
+            const double angle = qDegreesToRadians(-90.0 + index * 36.0);
+            const QPointF point(10.0 + qCos(angle) * radius, 10.0 + qSin(angle) * radius);
+            index == 0 ? star.moveTo(point) : star.lineTo(point);
+        }
+        star.closeSubpath();
+        painter.drawPath(star);
+    } else if (kind == HomeIcon::Target || kind == HomeIcon::Locate) {
+        painter.drawEllipse(QPointF(10, 10), kind == HomeIcon::Locate ? 6.0 : 5.5,
+                            kind == HomeIcon::Locate ? 6.0 : 5.5);
+        painter.drawEllipse(QPointF(10, 10), 1.8, 1.8);
+        painter.drawLine(QPointF(10, 0.8), QPointF(10, 3.3));
+        painter.drawLine(QPointF(10, 16.7), QPointF(10, 19.2));
+        painter.drawLine(QPointF(0.8, 10), QPointF(3.3, 10));
+        painter.drawLine(QPointF(16.7, 10), QPointF(19.2, 10));
+        if (kind == HomeIcon::Target) painter.drawRoundedRect(QRectF(3.2, 3.2, 13.6, 13.6), 6.8, 6.8);
+    } else if (kind == HomeIcon::Search) {
+        painter.drawEllipse(QRectF(2.4, 2.4, 11.2, 11.2));
+        painter.drawLine(QPointF(12.3, 12.3), QPointF(18.0, 18.0));
+    } else if (kind == HomeIcon::Navigation) {
+        painter.setBrush(color);
+        QPainterPath arrow;
+        arrow.moveTo(10.0, 1.5); arrow.lineTo(17.0, 17.5); arrow.lineTo(10.0, 14.5);
+        arrow.lineTo(3.0, 17.5); arrow.closeSubpath();
+        painter.drawPath(arrow);
+    } else if (kind == HomeIcon::Chevron) {
+        painter.drawLine(QPointF(7.5, 4.5), QPointF(13.0, 10.0));
+        painter.drawLine(QPointF(13.0, 10.0), QPointF(7.5, 15.5));
+    } else if (kind == HomeIcon::Pin) {
+        QPainterPath pin;
+        pin.moveTo(10, 18.2);
+        pin.cubicTo(8.0, 15.2, 4.0, 12.2, 4.0, 7.8);
+        pin.cubicTo(4.0, 4.4, 6.7, 1.8, 10.0, 1.8);
+        pin.cubicTo(13.3, 1.8, 16.0, 4.4, 16.0, 7.8);
+        pin.cubicTo(16.0, 12.2, 12.0, 15.2, 10, 18.2);
+        pin.closeSubpath();
+        painter.drawPath(pin);
+        painter.drawEllipse(QPointF(10, 7.8), 1.8, 1.8);
+    }
+    return QIcon(pixmap);
+}
+
+void configureIconButton(QPushButton* target, HomeIcon icon, const QColor& color,
+                         const QSize& iconSize = QSize(18, 18))
+{
+    target->setIcon(homeIcon(icon, color));
+    target->setIconSize(iconSize);
+}
+
+class StationCardWidget final : public QWidget
+{
+public:
+    explicit StationCardWidget(bool recommended, QWidget* parent = nullptr)
+        : QWidget(parent), recommended_(recommended)
+    {
+        setAttribute(Qt::WA_StyledBackground, false);
+        setMinimumHeight(112);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    }
+protected:
+    void paintEvent(QPaintEvent*) override
+    {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        const QRectF card = QRectF(rect()).adjusted(0.75, 0.75, -0.75, -0.75);
+        painter.setPen(QPen(QColor(recommended_ ? "#AFC9FF" : "#E4EAF0"), recommended_ ? 1.5 : 1.0));
+        painter.setBrush(Qt::white);
+        painter.drawRoundedRect(card, 15, 15);
+        if (!recommended_) return;
+
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(Theme::Blue));
+        QPainterPath ribbon;
+        ribbon.moveTo(1, 1); ribbon.lineTo(36, 1); ribbon.lineTo(1, 34); ribbon.closeSubpath();
+        painter.drawPath(ribbon);
+        painter.save();
+        painter.translate(6.5, 21.5);
+        painter.rotate(-43.0);
+        painter.setPen(Qt::white);
+        QFont ribbonFont = font();
+        ribbonFont.setPixelSize(8);
+        ribbonFont.setWeight(QFont::DemiBold);
+        painter.setFont(ribbonFont);
+        painter.drawText(QRectF(-2, -7, 28, 12), Qt::AlignCenter, QStringLiteral("推荐"));
+        painter.restore();
+    }
+private:
+    bool recommended_ = false;
+};
 
 QFrame* surface()
 {
@@ -277,7 +402,7 @@ private:
 
 EnergyMapWidget::EnergyMapWidget(QWidget* parent) : QWidget(parent)
 {
-    setMinimumHeight(285);
+    setMinimumHeight(180);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 }
 
@@ -304,16 +429,31 @@ void EnergyMapWidget::paintEvent(QPaintEvent*)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor("#E9EFED"));
+    p.setBrush(QColor("#EAF0F6"));
     p.drawRoundedRect(rect(), 20, 20);
 
-    QPen street(QColor("#FFFFFF"), 13, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-    p.setPen(street);
-    QPainterPath a; a.moveTo(-20, height()*0.72); a.cubicTo(width()*0.24,height()*0.48,width()*0.46,height()*0.84,width()+20,height()*0.34); p.drawPath(a);
-    QPainterPath b; b.moveTo(width()*0.18,-10); b.cubicTo(width()*0.35,height()*0.3,width()*0.22,height()*0.55,width()*0.5,height()+20); p.drawPath(b);
-    QPainterPath c; c.moveTo(width()*0.78,-10); c.lineTo(width()*0.62,height()+15); p.drawPath(c);
+    p.setBrush(QColor("#DFF2E8"));
+    p.drawRoundedRect(QRectF(width() * 0.03, 10, width() * 0.20, height() * 0.28), 14, 14);
+    p.drawRoundedRect(QRectF(width() * 0.70, height() * 0.45, width() * 0.17, height() * 0.24), 14, 14);
+    p.setBrush(QColor("#E3ECF8"));
+    p.drawRoundedRect(QRectF(width() * 0.34, 8, width() * 0.21, height() * 0.20), 12, 12);
+    p.drawRoundedRect(QRectF(width() * 0.48, height() * 0.48, width() * 0.16, height() * 0.22), 12, 12);
 
-    QPen route(QColor(Theme::Blue), 7, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+    QPen street(QColor("#FFFFFF"), 11, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+    p.setPen(street);
+    QPainterPath a; a.moveTo(-20, height()*0.71); a.cubicTo(width()*0.22,height()*0.48,width()*0.47,height()*0.76,width()+20,height()*0.36); p.drawPath(a);
+    QPainterPath b; b.moveTo(width()*0.15,-10); b.cubicTo(width()*0.29,height()*0.25,width()*0.20,height()*0.56,width()*0.43,height()+20); p.drawPath(b);
+    QPainterPath c; c.moveTo(width()*0.75,-10); c.cubicTo(width()*0.71,height()*0.26,width()*0.68,height()*0.56,width()*0.61,height()+15); p.drawPath(c);
+    QPainterPath d; d.moveTo(-10, height()*0.28); d.cubicTo(width()*0.32,height()*0.39,width()*0.63,height()*0.14,width()+10,height()*0.25); p.drawPath(d);
+    QPen localStreet(QColor("#F8FAFC"), 5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+    p.setPen(localStreet);
+    for (int index = 1; index < 6; ++index) {
+        p.drawLine(QPointF(width() * index / 6.0, 2),
+                   QPointF(width() * (index - 0.35) / 6.0, height() - 2));
+    }
+
+    QPen routeOutline(QColor("#D9E7FF"), 9, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+    QPen route(QColor(Theme::Blue), 5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
     p.setPen(route);
     QPainterPath line;
     QPointF destinationLabelAnchor;
@@ -354,7 +494,8 @@ void EnergyMapWidget::paintEvent(QPaintEvent*)
 
         line.moveTo(screenPoints.first());
         for (int index = 1; index < screenPoints.size(); ++index) line.lineTo(screenPoints.at(index));
-        p.drawPath(line);
+        p.setPen(routeOutline); p.drawPath(line);
+        p.setPen(route); p.drawPath(line);
 
         p.setPen(QPen(Qt::white, 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         const int arrowStride = qMax(1, static_cast<int>(screenPoints.size()) / 4);
@@ -397,43 +538,86 @@ void EnergyMapWidget::paintEvent(QPaintEvent*)
         p.fillPath(bolt, Qt::white);
         destinationLabelAnchor = destination;
         hasRenderedRoute = true;
-    } else {
-        line.moveTo(width()*0.12,height()*0.76);
-        line.cubicTo(width()*0.35,height()*0.5,width()*0.52,height()*0.72,width()*0.82,height()*0.3);
-        p.drawPath(line);
+    } else if (!stations_.isEmpty()) {
+        const QPointF origin(width() * 0.14, height() * 0.62);
+        const QPointF destination(width() * 0.70, height() * 0.29);
+        line.moveTo(origin);
+        line.cubicTo(width() * 0.15, height() * 0.80,
+                     width() * 0.48, height() * 0.64,
+                     width() * 0.56, height() * 0.47);
+        line.cubicTo(width() * 0.65, height() * 0.36,
+                     width() * 0.70, height() * 0.45,
+                     destination.x(), destination.y());
+        p.setPen(routeOutline); p.drawPath(line);
+        p.setPen(route); p.drawPath(line);
+
+        p.setPen(QPen(Qt::white, 3));
+        p.setBrush(QColor(Theme::Blue));
+        p.drawEllipse(origin, 13, 13);
+        QPainterPath pointer;
+        pointer.moveTo(origin + QPointF(1, -8));
+        pointer.lineTo(origin + QPointF(7, 7));
+        pointer.lineTo(origin + QPointF(0, 4));
+        pointer.lineTo(origin + QPointF(-7, 7));
+        pointer.closeSubpath();
+        p.fillPath(pointer, Qt::white);
+
+        p.setBrush(QColor(Theme::Blue));
+        p.drawEllipse(destination, 15, 15);
+        p.setPen(Qt::white);
+        QFont markerFont = font(); markerFont.setPixelSize(13); markerFont.setWeight(QFont::Bold);
+        p.setFont(markerFont);
+        p.drawText(QRectF(destination.x() - 15, destination.y() - 15, 30, 30),
+                   Qt::AlignCenter, QStringLiteral("1"));
+        destinationLabelAnchor = destination;
+        hasRenderedRoute = true;
     }
 
-    const int count = qMin(3, stations_.size());
-    const QPointF points[3] = {{width()*0.26,height()*0.64},{width()*0.54,height()*0.59},{width()*0.79,height()*0.34}};
-    for (int i = 0; i < count; ++i) {
-        p.setPen(QPen(Qt::white, 4)); p.setBrush(QColor(stations_[i].availableChargers > 0 ? Theme::Green : Theme::Amber));
-        p.drawEllipse(points[i], 9, 9);
+    const int extraCount = qMin(2, qMax(0, stations_.size() - 1));
+    const QPointF extraPoints[2] = {{width()*0.41,height()*0.43},{width()*0.84,height()*0.56}};
+    for (int i = 0; i < extraCount; ++i) {
+        p.setPen(QPen(Qt::white, 3));
+        p.setBrush(QColor(stations_[i + 1].availableChargers > 0 ? Theme::Green : Theme::Amber));
+        p.drawEllipse(extraPoints[i], 7, 7);
     }
-    if (stations_.isEmpty()) {
-        QFont f = font(); f.setPixelSize(13); p.setFont(f);
-        if (hasRenderedRoute) {
-            const qreal labelWidth = qMin<qreal>(150.0, width() * 0.36);
-            const qreal labelLeft = qMin<qreal>(width() - labelWidth - 12.0,
-                                                destinationLabelAnchor.x() - labelWidth * 0.55);
-            const QRectF labelRect(qMax<qreal>(14.0, labelLeft),
-                                   destinationLabelAnchor.y() + 20.0, labelWidth, 46.0);
-            p.setPen(Qt::NoPen);
-            p.setBrush(Qt::white);
-            p.drawRoundedRect(labelRect, 10, 10);
-            p.setPen(QColor(Theme::Ink));
-            f.setPixelSize(12); f.setWeight(QFont::DemiBold); p.setFont(f);
-            p.drawText(labelRect.adjusted(8,4,-8,-4),
-                       Qt::AlignVCenter | Qt::AlignHCenter | Qt::TextWordWrap, caption_);
-        } else {
-            p.setPen(QColor(Theme::Muted));
-            p.drawText(rect().adjusted(24, 24, -24, -24), Qt::AlignCenter, caption_);
+
+    QFont f = font(); f.setPixelSize(12); p.setFont(f);
+    if (hasRenderedRoute) {
+        const bool homeRoute = routePath_.isEmpty() && !stations_.isEmpty();
+        const QString routeLabel = homeRoute ? stations_.first().name : caption_;
+        const qreal labelWidth = qMin<qreal>(170.0, width() * 0.43);
+        const qreal labelLeft = qMin<qreal>(width() - labelWidth - 10.0,
+                                            destinationLabelAnchor.x() + 20.0);
+        const QRectF labelRect(qMax<qreal>(10.0, labelLeft),
+                               qMax<qreal>(8.0, destinationLabelAnchor.y() - 24.0),
+                               labelWidth, homeRoute ? 44.0 : 42.0);
+        p.setPen(Qt::NoPen);
+        p.setBrush(Qt::white);
+        p.drawRoundedRect(labelRect, 9, 9);
+        p.setPen(QColor(Theme::Ink));
+        f.setPixelSize(11); f.setWeight(QFont::DemiBold); p.setFont(f);
+        p.drawText(labelRect.adjusted(8, 3, -8, homeRoute ? -16 : -3),
+                   Qt::AlignVCenter | Qt::AlignLeft, routeLabel);
+        if (homeRoute) {
+            const QString available = stations_.first().availableChargers > 0
+                ? QStringLiteral("%1桩空闲").arg(stations_.first().availableChargers)
+                : QStringLiteral("暂无空闲");
+            const QRectF badge(labelRect.left() + 8, labelRect.bottom() - 18, 58, 15);
+            p.setBrush(QColor(stations_.first().availableChargers > 0 ? Theme::Green : Theme::Amber));
+            p.drawRoundedRect(badge, 5, 5);
+            p.setPen(Qt::white);
+            f.setPixelSize(8); f.setWeight(QFont::DemiBold); p.setFont(f);
+            p.drawText(badge, Qt::AlignCenter, available);
         }
+    } else if (stations_.isEmpty()) {
+        p.setPen(QColor(Theme::Muted));
+        p.drawText(rect().adjusted(24, 24, -24, -24), Qt::AlignCenter, caption_);
     }
 }
 
 AmapWidget::AmapWidget(QWidget* parent) : QWidget(parent)
 {
-    setMinimumHeight(285);
+    setMinimumHeight(180);
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
 
@@ -763,6 +947,11 @@ MobileApp::MobileApp(NetworkClient* network, QWidget* parent)
             station.distanceKm = i == 0 ? 1.2 : i == 1 ? 1.6 : 2.3;
             station.latitude = appConfig::kPreviewStationLatitude + i * 0.002;
             station.longitude = appConfig::kPreviewStationLongitude + i * 0.002;
+            station.address = i < 2 ? QStringLiteral("北京市房山区良乡高教园区")
+                                    : QStringLiteral("北京市房山区良乡大学城西路");
+            station.fastChargers = i == 0 ? 4 : i == 1 ? 3 : 2;
+            station.slowChargers = i == 0 ? 1 : i == 1 ? 1 : 4;
+            station.maxPowerKw = i < 2 ? 120.0 : 60.0;
             stations.append(station);
         }
         renderStationList(stations);
@@ -880,19 +1069,143 @@ QWidget* MobileApp::buildLoginPage()
 
 QWidget* MobileApp::buildHomePage()
 {
-    auto* page = new QWidget; page->setObjectName(QStringLiteral("Page"));
-    auto* outer = new QVBoxLayout(page); outer->setContentsMargins(0,0,0,0);
-    auto* scroll = new QScrollArea; scroll->setWidgetResizable(true); auto* body = new QWidget; auto* layout = new QVBoxLayout(body); layout->setContentsMargins(16,18,16,20); layout->setSpacing(10);
-    auto* titleRow = new QHBoxLayout; auto* texts = new QVBoxLayout; texts->setSpacing(2); texts->addWidget(label(QStringLiteral("附近充电站"), "PageTitle")); locationLabel_ = label(QStringLiteral("尚未设置位置"), "Muted"); texts->addWidget(locationLabel_); titleRow->addLayout(texts); titleRow->addStretch(); auto* refresh = button(QStringLiteral("刷新"), "Secondary"); refresh->setFixedWidth(72); titleRow->addWidget(refresh); layout->addLayout(titleRow);
-    auto* filters = new QHBoxLayout; filters->setSpacing(7); const QStringList filterNames{QStringLiteral("距离优先"),QStringLiteral("价格优先"),QStringLiteral("有空闲")};
-    for(int i=0;i<filterNames.size();++i){auto* chip=button(filterNames[i],i==0?"Secondary":"Quiet");chip->setCheckable(true);chip->setChecked(i==0);chip->setMinimumHeight(38);filters->addWidget(chip,1);connect(chip,&QPushButton::clicked,this,[this,i]{homeFilter_=i;applyHomeFilter();});} layout->addLayout(filters);
-    auto* search = new QHBoxLayout; search->setSpacing(8); addressInput_ = new QLineEdit; addressInput_->setPlaceholderText(QStringLiteral("输入城市、区域或详细地址")); locateButton_ = button(QStringLiteral("定位"), "Primary"); locateButton_->setFixedWidth(86); search->addWidget(addressInput_); search->addWidget(locateButton_); layout->addLayout(search);
-    homeNotice_ = label(QString(), "Muted"); homeNotice_->hide(); layout->addWidget(homeNotice_);
-    mapWidget_ = new AmapWidget; mapWidget_->setFixedHeight(205); layout->addWidget(mapWidget_);
-    auto* routeStrip = surface(); auto* routeLayout = new QHBoxLayout(routeStrip); routeLayout->setContentsMargins(16,10,10,10); homeRouteSummary_ = label(QStringLiteral("定位后显示最近路线"),"Muted"); routeLayout->addWidget(homeRouteSummary_,1); auto* viewRoute=button(QStringLiteral("查看路线"),"Quiet"); viewRoute->setFixedWidth(88); routeLayout->addWidget(viewRoute); layout->addWidget(routeStrip);
-    auto* listTitle = new QHBoxLayout; listTitle->addWidget(label(QStringLiteral("附近站点"), "SectionTitle")); listTitle->addStretch(); layout->addLayout(listTitle);
-    stationListBody_ = new QWidget; stationListLayout_ = new QVBoxLayout(stationListBody_); stationListLayout_->setContentsMargins(0,0,0,0); stationListLayout_->setSpacing(10); layout->addWidget(stationListBody_); layout->addStretch(); scroll->setWidget(body); outer->addWidget(scroll);
-    connect(locateButton_, &QPushButton::clicked, this, &MobileApp::locateAddress); connect(addressInput_, &QLineEdit::returnPressed, this, &MobileApp::locateAddress); connect(refresh, &QPushButton::clicked, this, &MobileApp::requestNearbyStations); connect(viewRoute,&QPushButton::clicked,this,[this]{if(nearestStationId_>0)requestStationDetail(nearestStationId_,true);});
+    auto* page = new QWidget;
+    page->setObjectName(QStringLiteral("Page"));
+    auto* outer = new QVBoxLayout(page);
+    outer->setContentsMargins(0, 0, 0, 0);
+
+    auto* scroll = new QScrollArea;
+    scroll->setWidgetResizable(true);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    auto* body = new QWidget;
+    auto* layout = new QVBoxLayout(body);
+    layout->setContentsMargins(16, 10, 16, 10);
+    layout->setSpacing(0);
+
+    auto* titleRow = new QHBoxLayout;
+    titleRow->setSpacing(8);
+    auto* texts = new QVBoxLayout;
+    texts->setSpacing(1);
+    texts->addWidget(label(QStringLiteral("附近充电站"), "HomeTitle"));
+    auto* locationRow = new QHBoxLayout;
+    locationRow->setSpacing(4);
+    auto* pin = label(QString());
+    pin->setPixmap(homeIcon(HomeIcon::Pin, QColor(Theme::Blue)).pixmap(15, 15));
+    pin->setFixedSize(16, 16);
+    pin->setAlignment(Qt::AlignCenter);
+    locationRow->addWidget(pin);
+    locationLabel_ = label(QStringLiteral("尚未设置位置"), "HomeLocation");
+    locationLabel_->setWordWrap(false);
+    locationRow->addWidget(locationLabel_);
+    auto* locationChevron = label(QString());
+    locationChevron->setPixmap(homeIcon(HomeIcon::Chevron, QColor(Theme::Muted)).pixmap(11, 11));
+    locationChevron->setFixedSize(12, 16);
+    locationRow->addWidget(locationChevron);
+    locationRow->addStretch();
+    texts->addLayout(locationRow);
+    titleRow->addLayout(texts, 1);
+    auto* refresh = button(QStringLiteral("刷新"), "HomeRefresh");
+    configureIconButton(refresh, HomeIcon::Refresh, QColor(Theme::Blue), QSize(16, 16));
+    refresh->setFixedSize(70, 42);
+    titleRow->addWidget(refresh, 0, Qt::AlignTop);
+    layout->addLayout(titleRow);
+
+    layout->addSpacing(6);
+    auto* searchRow = new QHBoxLayout;
+    searchRow->setSpacing(8);
+    auto* searchShell = new QFrame;
+    searchShell->setObjectName(QStringLiteral("HomeSearchShell"));
+    auto* searchLayout = new QHBoxLayout(searchShell);
+    searchLayout->setContentsMargins(14, 0, 8, 0);
+    searchLayout->setSpacing(8);
+    auto* searchIcon = label(QString());
+    searchIcon->setPixmap(homeIcon(HomeIcon::Search, QColor("#77879A")).pixmap(20, 20));
+    searchIcon->setFixedSize(22, 22);
+    searchLayout->addWidget(searchIcon);
+    addressInput_ = new QLineEdit;
+    addressInput_->setPlaceholderText(QStringLiteral("输入城市、区域或详细地址"));
+    addressInput_->setStyleSheet(QStringLiteral("QLineEdit{border:none;background:transparent;padding:0;min-height:48px;} QLineEdit:focus{border:none;padding:0;}"));
+    searchLayout->addWidget(addressInput_, 1);
+    locateButton_ = button(QStringLiteral("定位"), "HomeLocate");
+    configureIconButton(locateButton_, HomeIcon::Locate, QColor(Theme::Blue), QSize(19, 19));
+    locateButton_->setFixedSize(86, 50);
+    searchRow->addWidget(searchShell, 1);
+    searchRow->addWidget(locateButton_);
+    layout->addLayout(searchRow);
+
+    homeNotice_ = label(QString(), "Muted");
+    homeNotice_->hide();
+    layout->addWidget(homeNotice_);
+
+    layout->addSpacing(8);
+    auto* mapStage = new QWidget;
+    mapStage->setFixedHeight(230);
+    auto* mapStack = new QGridLayout(mapStage);
+    mapStack->setContentsMargins(0, 0, 0, 0);
+    mapStack->setSpacing(0);
+    mapWidget_ = new AmapWidget;
+    mapWidget_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    mapStack->addWidget(mapWidget_, 0, 0);
+    layout->addWidget(mapStage);
+
+    layout->addSpacing(10);
+    auto* listTitle = new QHBoxLayout;
+    listTitle->setSpacing(3);
+    listTitle->addWidget(label(QStringLiteral("附近站点"), "HomeSectionTitle"));
+    const QStringList filterNames{QStringLiteral("快充"), QStringLiteral("慢充"),
+                                  QStringLiteral("空闲"), QStringLiteral("最近")};
+    const QStringList filterTips{QStringLiteral("优先显示快充站点"), QStringLiteral("优先显示慢充站点"),
+                                 QStringLiteral("空闲站点优先"), QStringLiteral("距离最近优先")};
+    const QList<HomeIcon> filterIcons{HomeIcon::Bolt, HomeIcon::SlowBolt,
+                                      HomeIcon::Star, HomeIcon::Target};
+    auto* filterGroup = new QButtonGroup(this);
+    filterGroup->setExclusive(true);
+    for (int index = 0; index < filterNames.size(); ++index) {
+        auto* chip = button(filterNames.at(index), "HomeFilter");
+        chip->setToolTip(filterTips.at(index));
+        chip->setCheckable(true);
+        chip->setChecked(index == 0);
+        chip->setFixedSize(49, 30);
+        chip->setProperty("homeIconKind", static_cast<int>(filterIcons.at(index)));
+        configureIconButton(chip, filterIcons.at(index),
+                            QColor(index == 0 ? Theme::Blue : "#7B8CA2"), QSize(12, 12));
+        filterGroup->addButton(chip, index);
+        listTitle->addWidget(chip);
+        connect(chip, &QPushButton::clicked, this, [this, filterGroup, index] {
+            homeFilter_ = index;
+            for (QAbstractButton* item : filterGroup->buttons()) {
+                auto* filter = qobject_cast<QPushButton*>(item);
+                if (!filter) continue;
+                configureIconButton(filter,
+                    static_cast<HomeIcon>(filter->property("homeIconKind").toInt()),
+                    QColor(filter->isChecked() ? Theme::Blue : "#7B8CA2"), QSize(12, 12));
+            }
+            applyHomeFilter();
+        });
+    }
+    listTitle->addStretch();
+    stationCountLabel_ = label(QStringLiteral("共 0 个"), "HomeSectionCount");
+    stationCountLabel_->setWordWrap(false);
+    listTitle->addWidget(stationCountLabel_);
+    auto* listChevron = label(QString());
+    listChevron->setPixmap(homeIcon(HomeIcon::Chevron, QColor(Theme::Muted)).pixmap(12, 12));
+    listChevron->setFixedSize(14, 18);
+    listTitle->addWidget(listChevron);
+    layout->addLayout(listTitle);
+
+    layout->addSpacing(8);
+    stationListBody_ = new QWidget;
+    stationListLayout_ = new QVBoxLayout(stationListBody_);
+    stationListLayout_->setContentsMargins(0, 0, 0, 0);
+    stationListLayout_->setSpacing(8);
+    layout->addWidget(stationListBody_);
+    layout->addStretch();
+    scroll->setWidget(body);
+    outer->addWidget(scroll);
+
+    connect(locateButton_, &QPushButton::clicked, this, &MobileApp::locateAddress);
+    connect(addressInput_, &QLineEdit::returnPressed, this, &MobileApp::locateAddress);
+    connect(refresh, &QPushButton::clicked, this, &MobileApp::requestNearbyStations);
     return page;
 }
 
@@ -957,8 +1270,8 @@ QWidget* MobileApp::buildChargerPage()
     hero->setObjectName(QStringLiteral("ChargerHero"));
     hero->setStyleSheet(QStringLiteral("QFrame#ChargerHero{background:#FFFFFF;border:1px solid #DDE7FA;border-radius:16px}"));
     auto* heroLayout = new QVBoxLayout(hero);
-    heroLayout->setContentsMargins(18,16,18,14);
-    heroLayout->setSpacing(10);
+    heroLayout->setContentsMargins(18,14,18,12);
+    heroLayout->setSpacing(8);
 
     auto* deviceRow = new QHBoxLayout;
     auto* identity = new QVBoxLayout;
@@ -978,8 +1291,8 @@ QWidget* MobileApp::buildChargerPage()
     deviceRow->addLayout(identity,1);
     auto* product = new QLabel;
     product->setPixmap(QPixmap(QStringLiteral(":/resources/charger-product-v2.png"))
-        .scaled(112,138,Qt::KeepAspectRatio,Qt::SmoothTransformation));
-    product->setFixedSize(118,142);
+        .scaled(108,132,Qt::KeepAspectRatio,Qt::SmoothTransformation));
+    product->setFixedSize(114,136);
     product->setAlignment(Qt::AlignCenter);
     deviceRow->addWidget(product);
     heroLayout->addLayout(deviceRow);
@@ -1070,6 +1383,7 @@ QWidget* MobileApp::buildChargerPage()
     layout->addWidget(tips);
     chargerNotice_ = label(QString(),"Muted");
     layout->addWidget(chargerNotice_);
+    layout->addSpacing(12);
     layout->addStretch();
 
     auto* actionBar = new QWidget;
@@ -1421,13 +1735,165 @@ void MobileApp::requestNearbyStations()
 
 void MobileApp::renderStationList(const QList<StationInfo>& stations)
 {
-    nearbyStations_=stations;mapWidget_->setStations(stations);nearestStationId_=stations.isEmpty()?0:stations.first().stationId;if(stations.isEmpty())homeRouteSummary_->setText(QStringLiteral("附近暂无站点"));else homeRouteSummary_->setText(QStringLiteral("最近 %1 km · %2").arg(stations.first().distanceKm,0,'f',1).arg(stations.first().name));applyHomeFilter();
+    nearbyStations_ = stations;
+    if (stationCountLabel_) {
+        stationCountLabel_->setText(QStringLiteral("共 %1 个").arg(stations.size()));
+    }
+
+    QList<StationInfo> byDistance = stations;
+    std::sort(byDistance.begin(), byDistance.end(), [](const StationInfo& left, const StationInfo& right) {
+        return left.distanceKm < right.distanceKm;
+    });
+    mapWidget_->setStations(byDistance);
+    applyHomeFilter();
 }
 
 void MobileApp::applyHomeFilter()
 {
-    QList<StationInfo> stations=nearbyStations_;if(homeFilter_==1){std::sort(stations.begin(),stations.end(),[](const StationInfo&a,const StationInfo&b){return a.pricePerKwh<b.pricePerKwh;});}else if(homeFilter_==2){stations.erase(std::remove_if(stations.begin(),stations.end(),[](const StationInfo&s){return s.availableChargers<=0;}),stations.end());}else{std::sort(stations.begin(),stations.end(),[](const StationInfo&a,const StationInfo&b){return a.distanceKm<b.distanceKm;});}
-    clearLayout(stationListLayout_);if(stations.isEmpty()){stationListLayout_->addWidget(label(QStringLiteral("没有符合条件的站点"),"Muted"));return;}int rank=1;for(const auto&s:stations){auto* card=surface();auto* cardLayout=new QVBoxLayout(card);cardLayout->setContentsMargins(14,12,12,12);cardLayout->setSpacing(7);auto* header=new QHBoxLayout;auto* badge=label(QString::number(rank++));badge->setAlignment(Qt::AlignCenter);badge->setFixedSize(30,30);badge->setStyleSheet(QStringLiteral("background:#EAF1FF;color:#176CFF;border-radius:15px;font-weight:700"));header->addWidget(badge);header->addWidget(label(s.name,"SectionTitle"),1);auto* status=label(s.availableChargers>0?QStringLiteral("可充电"):QStringLiteral("暂无空闲"),s.availableChargers>0?"StatusOk":"StatusWarn");status->setAlignment(Qt::AlignCenter);header->addWidget(status);cardLayout->addLayout(header);cardLayout->addWidget(label(QStringLiteral("%1 km · ¥%2/度 · %3/%4 空闲").arg(s.distanceKm,0,'f',1).arg(s.pricePerKwh,0,'f',2).arg(s.availableChargers).arg(s.totalChargers),"Muted"));auto* actions=new QHBoxLayout;actions->addStretch();auto* nav=button(QStringLiteral("导航"),"Primary");nav->setFixedSize(72,42);auto* detail=button(QStringLiteral("详情"),"Secondary");detail->setFixedSize(72,42);actions->addWidget(nav);actions->addWidget(detail);cardLayout->addLayout(actions);connect(detail,&QPushButton::clicked,this,[this,id=s.stationId]{requestStationDetail(id);});connect(nav,&QPushButton::clicked,this,[this,id=s.stationId]{requestStationDetail(id,true);});stationListLayout_->addWidget(card);}stationListLayout_->addStretch();
+    QList<StationInfo> stations = nearbyStations_;
+    if (homeFilter_ == 0) {
+        stations.erase(std::remove_if(stations.begin(), stations.end(), [](const StationInfo& station) {
+            return station.fastChargers == 0;
+        }), stations.end());
+        std::stable_sort(stations.begin(), stations.end(), [](const StationInfo& left, const StationInfo& right) {
+            return left.fastChargers > right.fastChargers;
+        });
+    } else if (homeFilter_ == 1) {
+        stations.erase(std::remove_if(stations.begin(), stations.end(), [](const StationInfo& station) {
+            return station.slowChargers == 0;
+        }), stations.end());
+        std::stable_sort(stations.begin(), stations.end(), [](const StationInfo& left, const StationInfo& right) {
+            return left.slowChargers > right.slowChargers;
+        });
+    } else if (homeFilter_ == 2) {
+        std::stable_sort(stations.begin(), stations.end(), [](const StationInfo& left, const StationInfo& right) {
+            if ((left.availableChargers > 0) != (right.availableChargers > 0)) {
+                return left.availableChargers > 0;
+            }
+            return left.availableChargers > right.availableChargers;
+        });
+    } else {
+        std::sort(stations.begin(), stations.end(), [](const StationInfo& left, const StationInfo& right) {
+            return left.distanceKm < right.distanceKm;
+        });
+    }
+
+    clearLayout(stationListLayout_);
+    if (stations.isEmpty()) {
+        auto* empty = surface();
+        empty->setMinimumHeight(96);
+        auto* emptyLayout = new QVBoxLayout(empty);
+        emptyLayout->setContentsMargins(16, 14, 16, 14);
+        auto* headline = label(QStringLiteral("没有符合当前条件的站点"), "SectionTitle");
+        headline->setAlignment(Qt::AlignCenter);
+        emptyLayout->addWidget(headline);
+        auto* hint = label(QStringLiteral("可切换筛选，或重新输入位置后刷新"), "Muted");
+        hint->setAlignment(Qt::AlignCenter);
+        emptyLayout->addWidget(hint);
+        stationListLayout_->addWidget(empty);
+        stationListLayout_->addStretch();
+        return;
+    }
+
+    int rank = 1;
+    for (const StationInfo& station : stations) {
+        const bool recommended = rank == 1;
+        auto* card = new StationCardWidget(recommended);
+        auto* cardLayout = new QHBoxLayout(card);
+        cardLayout->setContentsMargins(recommended ? 18 : 12, 7, 10, 7);
+        cardLayout->setSpacing(7);
+
+        auto* badge = label(QString::number(rank));
+        badge->setAlignment(Qt::AlignCenter);
+        badge->setFixedSize(27, 27);
+        badge->setStyleSheet(recommended
+            ? QStringLiteral("background:#176CFF;color:#FFFFFF;border-radius:13px;font-size:14px;font-weight:700")
+            : QStringLiteral("background:#EAF1FF;color:#176CFF;border-radius:13px;font-size:14px;font-weight:700"));
+        cardLayout->addWidget(badge, 0, Qt::AlignTop);
+
+        auto* information = new QVBoxLayout;
+        information->setSpacing(3);
+        auto* stationName = label(station.name, "StationName");
+        stationName->setWordWrap(false);
+        stationName->setMinimumWidth(0);
+        information->addWidget(stationName);
+
+        auto* tagRow = new QHBoxLayout;
+        tagRow->setSpacing(4);
+        auto addTag = [&](const QString& text, const char* objectName = "StationTag") {
+            auto* tag = label(text, objectName);
+            tag->setWordWrap(false);
+            tag->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
+            tagRow->addWidget(tag);
+        };
+        addTag(station.availableChargers > 0 ? QStringLiteral("可充电") : QStringLiteral("暂无空闲"),
+               station.availableChargers > 0 ? "StationTagBlue" : "StationTagAmber");
+        if (station.fastChargers > 0) addTag(QStringLiteral("快充"));
+        if (station.maxPowerKw > 0.0) {
+            addTag(QStringLiteral("%1 kW").arg(station.maxPowerKw, 0, 'f', 0));
+        }
+        tagRow->addStretch();
+        information->addLayout(tagRow);
+
+        auto* address = label(station.address.isEmpty()
+            ? QStringLiteral("站点地址请查看详情") : station.address, "HomeLocation");
+        address->setStyleSheet(QStringLiteral("color:#54677F;font-size:11px"));
+        address->setWordWrap(false);
+        address->setMinimumWidth(0);
+        information->addWidget(address);
+
+        cardLayout->addLayout(information, 1);
+
+        auto* divider = new QFrame;
+        divider->setObjectName(QStringLiteral("VerticalDivider"));
+        cardLayout->addWidget(divider);
+
+        auto* metrics = new QVBoxLayout;
+        metrics->setSpacing(1);
+        auto* price = label(QStringLiteral("¥ %1").arg(station.pricePerKwh, 0, 'f', 2), "StationPrice");
+        price->setWordWrap(false);
+        metrics->addWidget(price);
+        metrics->addWidget(label(QStringLiteral("电价 / 度"), "StationCaption"));
+        metrics->addSpacing(5);
+        auto* availability = label(QStringLiteral("%1 / %2")
+            .arg(station.availableChargers).arg(station.totalChargers),
+            station.availableChargers > 0 ? "StationAvailable" : "StationUnavailable");
+        availability->setWordWrap(false);
+        metrics->addWidget(availability);
+        metrics->addWidget(label(QStringLiteral("空闲 / 总数"), "StationCaption"));
+        metrics->addStretch();
+        cardLayout->addLayout(metrics);
+
+        auto* actions = new QVBoxLayout;
+        actions->setSpacing(2);
+        auto* distance = label(QStringLiteral("%1 km").arg(station.distanceKm, 0, 'f', 1), "StationDistance");
+        distance->setAlignment(Qt::AlignRight);
+        distance->setWordWrap(false);
+        actions->addWidget(distance);
+        const int minutes = qMax(1, qCeil(station.distanceKm / 0.30));
+        auto* eta = label(QStringLiteral("约 %1 分钟").arg(minutes), "StationEta");
+        eta->setAlignment(Qt::AlignRight);
+        eta->setWordWrap(false);
+        actions->addWidget(eta);
+        auto* navigate = button(QStringLiteral("导航"), "StationNavigate");
+        configureIconButton(navigate, HomeIcon::Navigation, Qt::white, QSize(13, 13));
+        navigate->setFixedSize(66, 30);
+        actions->addWidget(navigate);
+        auto* detail = button(QStringLiteral("详情"), "StationDetail");
+        detail->setFixedSize(66, 28);
+        actions->addWidget(detail);
+        cardLayout->addLayout(actions);
+
+        connect(detail, &QPushButton::clicked, this, [this, id = station.stationId] {
+            requestStationDetail(id);
+        });
+        connect(navigate, &QPushButton::clicked, this, [this, id = station.stationId] {
+            requestStationDetail(id, true);
+        });
+        stationListLayout_->addWidget(card);
+        ++rank;
+    }
+    stationListLayout_->addStretch();
 }
 
 void MobileApp::requestStationDetail(qint64 stationId, bool navigateAfter)

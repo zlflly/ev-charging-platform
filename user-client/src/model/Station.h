@@ -17,6 +17,10 @@ struct StationInfo {
     double distanceKm = 0.0;
     double latitude = 0.0;
     double longitude = 0.0;
+    QString address;
+    int fastChargers = -1;
+    int slowChargers = -1;
+    double maxPowerKw = 0.0;
 
     bool valid() const { return stationId > 0; }
 
@@ -33,6 +37,14 @@ struct StationInfo {
         station.distanceKm = json.value(QStringLiteral("distanceKm")).toDouble();
         station.latitude = json.value(QStringLiteral("latitude")).toDouble();
         station.longitude = json.value(QStringLiteral("longitude")).toDouble();
+        station.address = json.value(QStringLiteral("address")).toString();
+        if (json.contains(QStringLiteral("fastChargers"))) {
+            station.fastChargers = json.value(QStringLiteral("fastChargers")).toInt();
+        }
+        if (json.contains(QStringLiteral("slowChargers"))) {
+            station.slowChargers = json.value(QStringLiteral("slowChargers")).toInt();
+        }
+        station.maxPowerKw = json.value(QStringLiteral("maxPowerKw")).toDouble();
         return station;
     }
 
