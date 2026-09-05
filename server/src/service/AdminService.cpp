@@ -4,12 +4,14 @@
 #include "protocol/ProtocolHelper.h"
 #include "repository/AdminRepository.h"
 #include "repository/ChargerRepository.h"
+#include "repository/Database.h"
 #include "repository/StationRepository.h"
 #include "repository/UserRepository.h"
 #include "repository/OrderRepository.h"
 
 #include <QDebug>
 #include <QDateTime>
+#include <QJsonArray>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QRegularExpression>
@@ -31,14 +33,14 @@ QJsonObject AdminService::handleLogin(const QJsonObject& data, QTcpSocket* socke
     QString password = data.value(QStringLiteral("password")).toString();
 
     if (account.isEmpty() || password.isEmpty()) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("账号和密码不能为空"));
     }
 
     auto admin = repository::AdminRepository::authenticate(account, password);
     if (!admin) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeAdminAuthFailed,
             QStringLiteral("管理员账号或密码错误"));
     }
@@ -53,7 +55,7 @@ QJsonObject AdminService::handleLogin(const QJsonObject& data, QTcpSocket* socke
 
     qInfo() << "[AdminService] Admin" << admin->adminId << "logged in";
 
-    return protocol::ProtocolHelper::success(result);
+    return protocol::makeSuccessResponse(result);
 }
 
 // ============================================================================
@@ -66,7 +68,7 @@ QJsonObject AdminService::handleChargerOverview(const QJsonObject& data, QTcpSoc
 
     // 检查管理员登录
     if (!net::SessionManager::instance().isAdminLoggedIn(socket)) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeNotLoggedIn,
             QStringLiteral("请先登录"));
     }
@@ -122,7 +124,7 @@ QJsonObject AdminService::handleChargerOverview(const QJsonObject& data, QTcpSoc
     result.insert(QStringLiteral("offlinePercent"), offlinePercent);
     result.insert(QStringLiteral("updatedAt"), QDateTime::currentMSecsSinceEpoch());
 
-    return protocol::ProtocolHelper::success(result);
+    return protocol::makeSuccessResponse(result);
 }
 
 // ============================================================================
@@ -135,7 +137,7 @@ QJsonObject AdminService::handleChargersList(const QJsonObject& data, QTcpSocket
 
     // 检查管理员登录
     if (!net::SessionManager::instance().isAdminLoggedIn(socket)) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeNotLoggedIn,
             QStringLiteral("请先登录"));
     }
@@ -168,7 +170,7 @@ QJsonObject AdminService::handleChargersList(const QJsonObject& data, QTcpSocket
     QJsonObject result;
     result.insert(QStringLiteral("chargers"), chargersArray);
 
-    return protocol::ProtocolHelper::success(result);
+    return protocol::makeSuccessResponse(result);
 }
 
 // ============================================================================
@@ -179,14 +181,14 @@ QJsonObject AdminService::handleChargersRestart(const QJsonObject& data, QTcpSoc
 {
     // 检查管理员登录
     if (!net::SessionManager::instance().isAdminLoggedIn(socket)) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeNotLoggedIn,
             QStringLiteral("请先登录"));
     }
 
     int chargerId = data.value(QStringLiteral("chargerId")).toInt();
     if (chargerId <= 0) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("chargerId 无效"));
     }
@@ -194,14 +196,14 @@ QJsonObject AdminService::handleChargersRestart(const QJsonObject& data, QTcpSoc
     // 查询充电桩
     auto charger = repository::ChargerRepository::findById(chargerId);
     if (!charger) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("充电桩不存在"));
     }
 
     // 检查充电桩状态：status=1（充电中）不能重启
     if (charger->status == protocol::ChargerStatusCharging) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             2101,  // CodeChargerOperationRejected
             QStringLiteral("充电桩正在服务订单，禁止重启操作"));
     }
@@ -213,7 +215,7 @@ QJsonObject AdminService::handleChargersRestart(const QJsonObject& data, QTcpSoc
     result.insert(QStringLiteral("chargerId"), chargerId);
     result.insert(QStringLiteral("restartedAt"), QDateTime::currentMSecsSinceEpoch());
 
-    return protocol::ProtocolHelper::success(result);
+    return protocol::makeSuccessResponse(result);
 }
 
 // ============================================================================
@@ -224,7 +226,7 @@ QJsonObject AdminService::handleChargersStatusUpdate(const QJsonObject& data, QT
 {
     // 检查管理员登录
     if (!net::SessionManager::instance().isAdminLoggedIn(socket)) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeNotLoggedIn,
             QStringLiteral("请先登录"));
     }
@@ -236,7 +238,7 @@ QJsonObject AdminService::handleChargersStatusUpdate(const QJsonObject& data, QT
 
     // 参数校验
     if (chargerId <= 0) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("chargerId 无效"));
     }
@@ -245,14 +247,14 @@ QJsonObject AdminService::handleChargersStatusUpdate(const QJsonObject& data, QT
     if (targetStatus != protocol::ChargerStatusIdle
         && targetStatus != protocol::ChargerStatusFault
         && targetStatus != protocol::ChargerStatusOffline) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("targetStatus 只能为 0(空闲)/2(故障)/3(离线)"));
     }
 
     // 原因长度校验
     if (reason.length() < 2 || reason.length() > 200) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("原因长度必须在 2-200 字符之间"));
     }
@@ -260,21 +262,21 @@ QJsonObject AdminService::handleChargersStatusUpdate(const QJsonObject& data, QT
     // 查询充电桩
     auto charger = repository::ChargerRepository::findById(chargerId);
     if (!charger) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("充电桩不存在"));
     }
 
     // 检查 expectedStatus 是否匹配（防止并发冲突）
     if (charger->status != expectedStatus) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             2103,  // CodeChargerStateConflict
             QStringLiteral("充电桩状态已变化，请刷新后重试"));
     }
 
     // 如果当前状态为 1（充电中），拒绝变更
     if (charger->status == protocol::ChargerStatusCharging) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             2101,  // CodeChargerOperationRejected
             QStringLiteral("充电桩正在服务订单，禁止状态变更"));
     }
@@ -282,14 +284,14 @@ QJsonObject AdminService::handleChargersStatusUpdate(const QJsonObject& data, QT
     // 检查是否有未完成订单（双重保险）
     auto activeOrder = repository::OrderRepository::findActiveOrderByCharger(chargerId);
     if (activeOrder) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             2101,
             QStringLiteral("充电桩关联有未完成订单，禁止状态变更"));
     }
 
     // 相同状态无效变更
     if (charger->status == targetStatus) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("当前状态与目标状态相同，无需变更"));
     }
@@ -297,7 +299,7 @@ QJsonObject AdminService::handleChargersStatusUpdate(const QJsonObject& data, QT
     // 更新状态
     int previousStatus = charger->status;
     if (!repository::ChargerRepository::updateStatus(chargerId, targetStatus)) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeServerError,
             QStringLiteral("状态更新失败"));
     }
@@ -311,7 +313,7 @@ QJsonObject AdminService::handleChargersStatusUpdate(const QJsonObject& data, QT
     result.insert(QStringLiteral("status"), targetStatus);
     result.insert(QStringLiteral("changedAt"), QDateTime::currentMSecsSinceEpoch());
 
-    return protocol::ProtocolHelper::success(result);
+    return protocol::makeSuccessResponse(result);
 }
 
 // ============================================================================
@@ -324,7 +326,7 @@ QJsonObject AdminService::handleStationsList(const QJsonObject& data, QTcpSocket
 
     // 检查管理员登录
     if (!net::SessionManager::instance().isAdminLoggedIn(socket)) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeNotLoggedIn,
             QStringLiteral("请先登录"));
     }
@@ -368,7 +370,7 @@ QJsonObject AdminService::handleStationsList(const QJsonObject& data, QTcpSocket
     QJsonObject result;
     result.insert(QStringLiteral("stations"), stationsArray);
 
-    return protocol::ProtocolHelper::success(result);
+    return protocol::makeSuccessResponse(result);
 }
 
 // ============================================================================
@@ -379,7 +381,7 @@ QJsonObject AdminService::handleStationsCreate(const QJsonObject& data, QTcpSock
 {
     // 检查管理员登录
     if (!net::SessionManager::instance().isAdminLoggedIn(socket)) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeNotLoggedIn,
             QStringLiteral("请先登录"));
     }
@@ -393,37 +395,37 @@ QJsonObject AdminService::handleStationsCreate(const QJsonObject& data, QTcpSock
 
     // 参数校验
     if (name.length() < 1 || name.length() > 60) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("站点名称长度必须在 1-60 字符之间"));
     }
 
     if (address.length() < 1 || address.length() > 200) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("站点地址长度必须在 1-200 字符之间"));
     }
 
     if (latitude < -90.0 || latitude > 90.0) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("纬度范围必须在 -90 到 90 之间"));
     }
 
     if (longitude < -180.0 || longitude > 180.0) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("经度范围必须在 -180 到 180 之间"));
     }
 
     if (pricePerKwh <= 0.0 || !qIsFinite(pricePerKwh)) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("电价必须为有限正数"));
     }
 
     if (chargerCount < 0 || chargerCount > 100) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("充电桩数量必须在 0-100 之间"));
     }
@@ -438,7 +440,7 @@ QJsonObject AdminService::handleStationsCreate(const QJsonObject& data, QTcpSock
 
     int stationId = repository::StationRepository::create(newStation);
     if (stationId <= 0) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeServerError,
             QStringLiteral("站点创建失败"));
     }
@@ -464,7 +466,7 @@ QJsonObject AdminService::handleStationsCreate(const QJsonObject& data, QTcpSock
     result.insert(QStringLiteral("stationId"), stationId);
     result.insert(QStringLiteral("createdChargerCount"), createdCount);
 
-    return protocol::ProtocolHelper::success(result);
+    return protocol::makeSuccessResponse(result);
 }
 
 // ============================================================================
@@ -475,7 +477,7 @@ QJsonObject AdminService::handleStationsUpdate(const QJsonObject& data, QTcpSock
 {
     // 检查管理员登录
     if (!net::SessionManager::instance().isAdminLoggedIn(socket)) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeNotLoggedIn,
             QStringLiteral("请先登录"));
     }
@@ -490,37 +492,37 @@ QJsonObject AdminService::handleStationsUpdate(const QJsonObject& data, QTcpSock
 
     // 参数校验
     if (stationId <= 0) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("stationId 无效"));
     }
 
     if (name.length() < 1 || name.length() > 60) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("站点名称长度必须在 1-60 字符之间"));
     }
 
     if (address.length() < 1 || address.length() > 200) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("站点地址长度必须在 1-200 字符之间"));
     }
 
     if (latitude < -90.0 || latitude > 90.0) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("纬度范围必须在 -90 到 90 之间"));
     }
 
     if (longitude < -180.0 || longitude > 180.0) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("经度范围必须在 -180 到 180 之间"));
     }
 
     if (pricePerKwh <= 0.0 || !qIsFinite(pricePerKwh)) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("电价必须为有限正数"));
     }
@@ -528,14 +530,14 @@ QJsonObject AdminService::handleStationsUpdate(const QJsonObject& data, QTcpSock
     // 查询站点
     auto station = repository::StationRepository::findById(stationId);
     if (!station) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("充电站不存在"));
     }
 
     // 检查版本（防止并发冲突）
     if (station->version != expectedVersion) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             2102,  // CodeStationVersionConflict
             QStringLiteral("站点资料已被其他管理员修改，请刷新后重试"));
     }
@@ -549,7 +551,7 @@ QJsonObject AdminService::handleStationsUpdate(const QJsonObject& data, QTcpSock
     updatedStation.pricePerKwh = pricePerKwh;
 
     if (!repository::StationRepository::update(updatedStation)) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeServerError,
             QStringLiteral("站点更新失败"));
     }
@@ -561,7 +563,7 @@ QJsonObject AdminService::handleStationsUpdate(const QJsonObject& data, QTcpSock
     result.insert(QStringLiteral("version"), updatedStation.version);
     result.insert(QStringLiteral("updatedAt"), QDateTime::currentMSecsSinceEpoch());
 
-    return protocol::ProtocolHelper::success(result);
+    return protocol::makeSuccessResponse(result);
 }
 
 // ============================================================================
@@ -572,7 +574,7 @@ QJsonObject AdminService::handleUsersList(const QJsonObject& data, QTcpSocket* s
 {
     // 检查管理员登录
     if (!net::SessionManager::instance().isAdminLoggedIn(socket)) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeNotLoggedIn,
             QStringLiteral("请先登录"));
     }
@@ -586,13 +588,13 @@ QJsonObject AdminService::handleUsersList(const QJsonObject& data, QTcpSocket* s
     // 参数校验
     if (page < 1) page = 1;
     if (pageSize < 1 || pageSize > 100) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("pageSize 必须在 1-100 之间"));
     }
 
     if (phoneKeyword.length() > 11) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("phoneKeyword 最多 11 位"));
     }
@@ -600,7 +602,7 @@ QJsonObject AdminService::handleUsersList(const QJsonObject& data, QTcpSocket* s
     if (activityFilter != QStringLiteral("ALL")
         && activityFilter != QStringLiteral("ACTIVE")
         && activityFilter != QStringLiteral("IDLE")) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("activityFilter 必须为 ALL/ACTIVE/IDLE"));
     }
@@ -684,7 +686,7 @@ QJsonObject AdminService::handleUsersList(const QJsonObject& data, QTcpSocket* s
     result.insert(QStringLiteral("page"), page);
     result.insert(QStringLiteral("pageSize"), pageSize);
 
-    return protocol::ProtocolHelper::success(result);
+    return protocol::makeSuccessResponse(result);
 }
 
 // ============================================================================
@@ -695,7 +697,7 @@ QJsonObject AdminService::handleUsersFreeze(const QJsonObject& data, QTcpSocket*
 {
     // 检查管理员登录
     if (!net::SessionManager::instance().isAdminLoggedIn(socket)) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeNotLoggedIn,
             QStringLiteral("请先登录"));
     }
@@ -707,19 +709,19 @@ QJsonObject AdminService::handleUsersFreeze(const QJsonObject& data, QTcpSocket*
 
     // 参数校验
     if (userId <= 0) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("userId 无效"));
     }
 
     if (targetStatus != 0 && targetStatus != 1) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("targetStatus 只能为 0(正常)/1(冻结)"));
     }
 
     if (reason.length() < 2 || reason.length() > 200) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("原因长度必须在 2-200 字符之间"));
     }
@@ -727,21 +729,21 @@ QJsonObject AdminService::handleUsersFreeze(const QJsonObject& data, QTcpSocket*
     // 查询用户
     auto user = repository::UserRepository::findById(userId);
     if (!user) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("用户不存在"));
     }
 
     // 检查 expectedStatus（防止并发冲突）
     if (user->status != expectedStatus) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             2104,  // CodeUserStateConflict
             QStringLiteral("用户状态已变化，请刷新后重试"));
     }
 
     // 相同状态无效变更
     if (user->status == targetStatus) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("当前状态与目标状态相同，无需变更"));
     }
@@ -749,7 +751,7 @@ QJsonObject AdminService::handleUsersFreeze(const QJsonObject& data, QTcpSocket*
     // 检查是否有未完成订单（安全策略：有活跃订单时拒绝冻结）
     auto activeOrder = repository::OrderRepository::findActiveByUser(userId);
     if (activeOrder && targetStatus == 1) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeOrderConflict,
             QStringLiteral("用户有未完成订单，禁止冻结操作"));
     }
@@ -757,7 +759,7 @@ QJsonObject AdminService::handleUsersFreeze(const QJsonObject& data, QTcpSocket*
     // 更新状态
     int previousStatus = user->status;
     if (!repository::UserRepository::updateStatus(userId, targetStatus)) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeServerError,
             QStringLiteral("状态更新失败"));
     }
@@ -771,7 +773,7 @@ QJsonObject AdminService::handleUsersFreeze(const QJsonObject& data, QTcpSocket*
     result.insert(QStringLiteral("status"), targetStatus);
     result.insert(QStringLiteral("changedAt"), QDateTime::currentMSecsSinceEpoch());
 
-    return protocol::ProtocolHelper::success(result);
+    return protocol::makeSuccessResponse(result);
 }
 
 // ============================================================================
@@ -784,7 +786,7 @@ QJsonObject AdminService::handleRevenueSummary(const QJsonObject& data, QTcpSock
 
     // 检查管理员登录
     if (!net::SessionManager::instance().isAdminLoggedIn(socket)) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeNotLoggedIn,
             QStringLiteral("请先登录"));
     }
@@ -825,7 +827,7 @@ QJsonObject AdminService::handleRevenueSummary(const QJsonObject& data, QTcpSock
     result.insert(QStringLiteral("timezone"), QStringLiteral("Asia/Shanghai"));
     result.insert(QStringLiteral("generatedAt"), nowDt.toString(Qt::ISODate));
 
-    return protocol::ProtocolHelper::success(result);
+    return protocol::makeSuccessResponse(result);
 }
 
 // ============================================================================
@@ -836,7 +838,7 @@ QJsonObject AdminService::handleRevenueTrend(const QJsonObject& data, QTcpSocket
 {
     // 检查管理员登录
     if (!net::SessionManager::instance().isAdminLoggedIn(socket)) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeNotLoggedIn,
             QStringLiteral("请先登录"));
     }
@@ -845,7 +847,7 @@ QJsonObject AdminService::handleRevenueTrend(const QJsonObject& data, QTcpSocket
 
     // 参数校验
     if (days != 7 && days != 30) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("days 只能为 7 或 30"));
     }
@@ -896,7 +898,7 @@ QJsonObject AdminService::handleRevenueTrend(const QJsonObject& data, QTcpSocket
     result.insert(QStringLiteral("generatedAt"), nowDt.toString(Qt::ISODate));
     result.insert(QStringLiteral("points"), pointsArray);
 
-    return protocol::ProtocolHelper::success(result);
+    return protocol::makeSuccessResponse(result);
 }
 
 // ============================================================================
@@ -907,7 +909,7 @@ QJsonObject AdminService::handleOrdersList(const QJsonObject& data, QTcpSocket* 
 {
     // 检查管理员登录
     if (!net::SessionManager::instance().isAdminLoggedIn(socket)) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeNotLoggedIn,
             QStringLiteral("请先登录"));
     }
@@ -921,13 +923,13 @@ QJsonObject AdminService::handleOrdersList(const QJsonObject& data, QTcpSocket* 
     // 参数校验
     if (page < 1) page = 1;
     if (pageSize < 1 || pageSize > 100) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("pageSize 必须在 1-100 之间"));
     }
 
     if (keyword.length() > 50) {
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeBadRequest,
             QStringLiteral("keyword 最多 50 字符"));
     }
@@ -950,7 +952,7 @@ QJsonObject AdminService::handleOrdersList(const QJsonObject& data, QTcpSocket* 
 
     if (!query.exec(sql)) {
         qWarning() << "Failed to query orders:" << query.lastError().text();
-        return protocol::ProtocolHelper::error(
+        return protocol::makeErrorResponse(
             protocol::CodeServerError,
             QStringLiteral("订单查询失败"));
     }
@@ -1070,7 +1072,7 @@ QJsonObject AdminService::handleOrdersList(const QJsonObject& data, QTcpSocket* 
     result.insert(QStringLiteral("generatedAt"), QDateTime::currentMSecsSinceEpoch());
     result.insert(QStringLiteral("platformSummary"), platformSummary);
 
-    return protocol::ProtocolHelper::success(result);
+    return protocol::makeSuccessResponse(result);
 }
 
 } // namespace service

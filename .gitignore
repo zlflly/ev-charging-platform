@@ -34,15 +34,15 @@ moc_*.cpp
 ui_*.h
 qrc_*.cpp
 
-# Binaries
+# Binaries（锚定仓库根目录，避免误忽略 user-client/、admin-client/ 源码目录）
 *.exe
 *.out
 *.app
-ev-server
-mock-server
+/ev-server
+/mock-server
+/user-client
+/admin-client
 *-smoke-test
-user-client
-admin-client
 
 # Database
 *.db

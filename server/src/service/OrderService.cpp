@@ -5,6 +5,7 @@
 #include "repository/StationRepository.h"
 #include "net/SessionManager.h"
 #include "protocol/ProtocolHelper.h"
+#include <QJsonArray>
 #include <QDebug>
 #include <QDateTime>
 
@@ -75,13 +76,10 @@ QJsonObject OrderService::handleReserve(const QJsonObject& data, QTcpSocket* soc
     const auto& station = stationOpt.value();
 
     // 创建订单
-    qint64 now = QDateTime::currentMSecsSinceEpoch();
-
-    auto newOrderOpt = repository::OrderRepository::create(
+    auto newOrderOpt = repository::OrderRepository::createReservation(
         userId,
-        charger.stationId,
         chargerId,
-        now
+        charger.stationId
     );
 
     if (!newOrderOpt.has_value()) {
@@ -134,7 +132,7 @@ QJsonObject OrderService::handleStart(const QJsonObject& data, QTcpSocket* socke
     // 开始充电：更新订单状态和开始时间
     qint64 now = QDateTime::currentMSecsSinceEpoch();
 
-    if (!repository::OrderRepository::updateStatus(orderId, protocol::kOrderStatusCharging, now, 0, 0)) {
+    if (!repository::OrderRepository::startCharging(orderId, now)) {
         return protocol::makeErrorResponse(protocol::CodeServerError, "订单状态更新失败");
     }
 
@@ -259,15 +257,10 @@ QJsonObject OrderService::handleStop(const QJsonObject& data, QTcpSocket* socket
         }
     }
 
-    // 更新订单：CHARGING → WAIT_SETTLEMENT
-    if (!repository::OrderRepository::updateStatus(orderId, protocol::kOrderStatusWaitSettlement,
-                                                   order.startTime, now, 0)) {
+    // 更新订单：CHARGING → WAIT_SETTLEMENT（含时长、电量、金额）
+    int durationSeconds = static_cast<int>(elapsedMs / 1000);
+    if (!repository::OrderRepository::stopCharging(orderId, now, durationSeconds, energyKwh, amount)) {
         return protocol::makeErrorResponse(protocol::CodeServerError, "订单状态更新失败");
-    }
-
-    // 更新电量和金额
-    if (!repository::OrderRepository::updateEnergyAndAmount(orderId, energyKwh, amount)) {
-        qWarning() << "[OrderService] Failed to update energy and amount";
     }
 
     // 重新查询订单
@@ -344,8 +337,7 @@ QJsonObject OrderService::handleSettle(const QJsonObject& data, QTcpSocket* sock
 
     // 更新订单状态：WAIT_SETTLEMENT → FINISHED
     qint64 now = QDateTime::currentMSecsSinceEpoch();
-    if (!repository::OrderRepository::updateStatus(orderId, protocol::kOrderStatusFinished,
-                                                   order.startTime, order.stopTime, now)) {
+    if (!repository::OrderRepository::settle(orderId, now)) {
         // 扣款已成功但订单状态更新失败，需要回滚（这里简化处理）
         qCritical() << "[OrderService] Order status update failed after deduction!";
         return protocol::makeErrorResponse(protocol::CodeServerError, "订单状态更新失败");

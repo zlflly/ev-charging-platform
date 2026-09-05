@@ -14,6 +14,7 @@
 #include "net/TcpConnection.h"
 #include "net/SessionManager.h"
 #include "protocol/Protocol.h"
+#include "protocol/ProtocolHelper.h"
 #include "service/UserService.h"
 #include "service/StationService.h"
 #include "service/OrderService.h"
