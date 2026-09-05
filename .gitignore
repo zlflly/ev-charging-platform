@@ -1,4 +1,80 @@
+# === user-client 侧（本地 main 原有） ===
 /.deps/
 /user-client/local.env
 /user-client/build/
 /.impeccable/review/
+
+# === server 侧（fengshu-server-db 合入） ===
+# Development reference materials
+reference-member2/
+reference-member3/
+reference-member4/
+成员1_任务说明书.md
+项目说明书_东软电动汽车充电桩应用管理平台.md
+
+# IDE
+.idea/
+.vscode/
+cmake-build-*/
+
+# Build artifacts
+server/build/
+server/cmake-build-*/
+**/CMakeCache.txt
+**/CMakeFiles/
+**/cmake_install.cmake
+**/Makefile
+**/compile_commands.json
+**/*.user
+**/*.autosave
+
+# Qt generated
+*_autogen/
+moc_*.cpp
+ui_*.h
+qrc_*.cpp
+
+# Binaries
+*.exe
+*.out
+*.app
+ev-server
+mock-server
+*-smoke-test
+user-client
+admin-client
+
+# Database
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Logs and temp
+*.log
+*.tmp
+mock-state.json
+
+# Documentation (generated or notes)
+*.swp
+*.swo
+*~
+.DS_Store
+CLION_SETUP.md
+
+# Test artifacts
+test_output/
+test_results/
+
+# Python (for ML integration)
+__pycache__/
+*.py[cod]
+*.so
+.Python
+venv/
+ENV/
+.venv
+
+# Editor backup
+*.bak
+*.orig
