@@ -671,6 +671,47 @@ bool AdminApiClient::isRevenueTrendInFlight() const
     return revenueTrendInFlightCount_ > 0;
 }
 
+bool AdminApiClient::requestOrders(const OrderListQuery& query,
+                                   OrderListCallback callback)
+{
+    if (orderListInFlight_) return false;
+    QString validationError;
+    if (!query.validate(&validationError)) {
+        if (callback) callback(std::nullopt, validationError);
+        return false;
+    }
+    orderListInFlight_ = true;
+    sendAuthenticated(
+        QString::fromUtf8(protocol::action::kAdminOrderList), query.toJson(),
+        [this, query, callback = std::move(callback)](
+            const protocol::Response& response) {
+            orderListInFlight_ = false;
+            if (!response.isOk()) {
+                if (callback) {
+                    callback(std::nullopt,
+                             protocol::describeError(response.code, response.message));
+                }
+                return;
+            }
+            OrderListPage page;
+            QString parseError;
+            if (!OrderListPage::fromJson(response.data, query, &page, &parseError)) {
+                if (callback) {
+                    callback(std::nullopt,
+                             QStringLiteral("订单列表数据异常：%1").arg(parseError));
+                }
+                return;
+            }
+            if (callback) callback(page, {});
+        });
+    return true;
+}
+
+bool AdminApiClient::isOrderListInFlight() const
+{
+    return orderListInFlight_;
+}
+
 QString AdminApiClient::sendAuthenticated(const QString& action,
                                           const QJsonObject& data,
                                           NetworkClient::ResponseCallback callback,

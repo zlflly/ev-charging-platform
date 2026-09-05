@@ -1,6 +1,6 @@
 # EV Charging Platform - Admin Client
 
-Linux + Qt 6 管理员桌面客户端。当前已完成 Commit 6：
+Linux + Qt 6 管理员桌面客户端。当前已完成营收分析及订单管理客户端搭建：
 
 - 宽屏后台主框架与统一导航；
 - 单例式共享 `NetworkClient`，采用 4 字节大端长度前缀 + UTF-8 JSON；
@@ -66,6 +66,14 @@ Linux + Qt 6 管理员桌面客户端。当前已完成 Commit 6：
   不把缓存数据伪装成最新统计；
 - `WAIT_SETTLEMENT`（待支付）不计营收，只有 `FINISHED` 订单按 `settleTime` 计入；
   字段尚未被成员 A 冻结的部分已在正式协议中明确标注为联调契约。
+- 新增只读订单管理页，通过服务端分页查询全平台订单，展示用户、站点、充电桩、
+  单价、功率、电量、金额、生命周期时间、业务状态与支付状态；
+- 订单搜索由服务端同时覆盖订单号、手机号、昵称、站点名和桩编号，并支持业务状态/
+  支付状态组合筛选；排序后通过隐藏 `orderId` 加载详情，不依赖视图行号；
+- 充电中金额明确标记为服务端实时预估，待支付金额为最终未扣款，只有已完成订单计入
+  已支付汇总；页面不会代替用户停止、结算、篡改金额或删除订单；
+- `admin.orders.list` 尚未在成员 A 分支实现，已作为客户端先行契约完整写入协议，
+  Mock 与冒烟测试覆盖分页、关联搜索、状态筛选、空结果和跨字段一致性校验。
 
 管理员协议见 `docs/admin-protocol.md`。默认 `admin/123456` 仅由数据库或 mock
 server 提供，客户端不在本地判断账号密码。
@@ -103,6 +111,18 @@ cmake --build build -j
 
 测试会先验证错误密码被拒绝，再验证种子账号登录成功；看到
 `AUTH SMOKE TEST PASSED` 表示认证协议闭环通过。
+
+## Order management smoke test
+
+保持 mock server 运行，在另一终端执行：
+
+```bash
+./build/admin-order-management-smoke-test
+```
+
+测试覆盖订单分页、平台汇总、用户/设备关联搜索、业务与支付状态组合筛选、空结果、
+重复请求保护，以及订单/支付/计费/时间字段的交叉校验；看到
+`ORDER MANAGEMENT SMOKE TEST PASSED` 表示订单管理客户端闭环通过。
 
 ## Charger status overview smoke test
 

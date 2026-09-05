@@ -15,6 +15,7 @@ class StationManagementPage;
 class UserManagementPage;
 class RevenueStatisticsPage;
 class OperationsOverviewPage;
+class OrderManagementPage;
 
 class MainWindow final : public QMainWindow
 {
@@ -54,6 +55,7 @@ private:
     ChargerManagementPage* chargerManagementPage_ = nullptr;
     StationManagementPage* stationManagementPage_ = nullptr;
     UserManagementPage* userManagementPage_ = nullptr;
+    OrderManagementPage* orderManagementPage_ = nullptr;
     RevenueStatisticsPage* revenueStatisticsPage_ = nullptr;
     QPushButton* connectionButton_ = nullptr;
     QList<QPushButton*> navigationButtons_;

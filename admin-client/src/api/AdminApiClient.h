@@ -5,6 +5,7 @@
 #include "model/Station.h"
 #include "model/User.h"
 #include "model/Revenue.h"
+#include "model/Order.h"
 #include "net/NetworkClient.h"
 
 #include <QJsonObject>
@@ -57,6 +58,9 @@ public:
     using RevenueTrendCallback = std::function<void(
         std::optional<RevenueTrend> trend,
         const QString& errorMessage)>;
+    using OrderListCallback = std::function<void(
+        std::optional<OrderListPage> page,
+        const QString& errorMessage)>;
 
     explicit AdminApiClient(NetworkClient* network,
                             AdminSession* session,
@@ -93,6 +97,8 @@ public:
     bool isRevenueSummaryInFlight() const;
     bool requestRevenueTrend(int days, RevenueTrendCallback callback);
     bool isRevenueTrendInFlight() const;
+    bool requestOrders(const OrderListQuery& query, OrderListCallback callback);
+    bool isOrderListInFlight() const;
 
     QString sendAuthenticated(const QString& action,
                               const QJsonObject& data,
@@ -124,6 +130,7 @@ private:
     bool userStatusUpdateInFlight_ = false;
     bool revenueSummaryInFlight_ = false;
     int revenueTrendInFlightCount_ = 0;
+    bool orderListInFlight_ = false;
     QString pendingAccount_;
     QString pendingPassword_;
 };

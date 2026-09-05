@@ -788,6 +788,140 @@ Commit 6 首页只复用已经存在的查询结果：
 3. 仅执行停止、让订单停在 `WAIT_SETTLEMENT` 时，营收不得增加。
 4. 如大屏也展示营收，成员 4 必须复用相同接口与口径，不能另行统计。
 
+## 管理员订单列表
+
+> 对齐状态：成员 A 已实现并冻结用户侧订单状态机与
+> `order.active/reserve/start/status/stop/settle/history`。其中 `order.history` 受用户
+> 会话约束且只返回当前用户的 `FINISHED` 订单，管理端不得伪造用户会话复用。
+> 截至 A 分支 `476cf27`，尚无平台级管理员订单 action。以下
+> `admin.orders.list` 是客户端先行联调契约，成员 A 实现服务端时需复用现有
+> `OrderRepository/UserRepository/StationRepository/ChargerRepository`，并将最终字段
+> 回写权威协议；若字段变更，客户端、Mock、测试和本文必须同批更新。
+
+请求：
+
+```json
+{
+  "action": "admin.orders.list",
+  "requestId": "admin-14",
+  "data": {
+    "page": 1,
+    "pageSize": 20,
+    "keyword": "1380013",
+    "status": "ALL",
+    "paymentStatus": "ALL"
+  }
+}
+```
+
+- `page` 从 1 开始，`pageSize` 为 1～100；服务端按订单创建时间倒序，时间相同时按
+  `orderId` 倒序，保证分页顺序稳定。
+- `keyword` 必须为字符串，去除首尾空白后最多 50 字。空串返回全部；非空时由服务端
+  在订单号、手机号、昵称、站点名和桩编号中查询，不能只过滤当前页。
+- `status` 固定为 `ALL / RESERVED / CHARGING / WAIT_SETTLEMENT / FINISHED`。
+- `paymentStatus` 固定为 `ALL / NOT_DUE / UNPAID / PAID`。业务状态和支付状态同时
+  生效；不相容组合正常返回空数组，不改写查询条件。
+
+成功响应：
+
+```json
+{
+  "requestId": "admin-14",
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "orders": [
+      {
+        "orderId": 9009,
+        "userId": 3,
+        "phone": "13800138003",
+        "nickname": "充电中用户",
+        "status": "CHARGING",
+        "paymentStatus": "NOT_DUE",
+        "amountKind": "ESTIMATED",
+        "stationId": 2,
+        "stationName": "中关村科技园站",
+        "chargerId": 1007,
+        "chargerCode": "CP-007",
+        "type": 0,
+        "powerKw": 120.0,
+        "pricePerKwh": 1.80,
+        "energyKwh": 12.40,
+        "amount": 22.32,
+        "createdAt": 1788570000000,
+        "startTime": 1788570300000,
+        "stopTime": 0,
+        "settleTime": 0,
+        "durationSeconds": 465
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "pageSize": 20,
+    "generatedAt": 1788570765000,
+    "platformSummary": {
+      "totalOrders": 126,
+      "reservedCount": 2,
+      "chargingCount": 5,
+      "waitSettlementCount": 3,
+      "finishedCount": 116,
+      "paidAmount": 15280.25
+    }
+  }
+}
+```
+
+### 字段复用与新增字段
+
+| 字段 | 来源/口径 |
+|---|---|
+| `orderId/status/stationId/chargerId/startTime/stopTime/settleTime/energyKwh/amount` | 复用成员 A 当前订单实体与用户订单响应 |
+| `userId` | 复用订单归属字段；服务端据此关联用户，客户端不猜测 |
+| `chargerCode/type/powerKw` | 复用 A 当前 `buildOrderJson` 的充电桩关联字段 |
+| `stationName/pricePerKwh` | 复用 A 当前 `buildOrderJson` 的站点关联字段 |
+| `phone/nickname` | 服务端按 `userId` 关联的用户快照字段 |
+| `createdAt` | 复用 A `OrderRepository::Order.createdAt`；不采用用户端尚未冻结的 `createTime` |
+| `durationSeconds` | 复用 Repository 的秒级 `duration` 语义；充电中按 `generatedAt-startTime` 返回实时值 |
+| `paymentStatus/amountKind` | 管理员展示所需的显式派生字段，映射规则见下表 |
+
+`type` 与充电桩协议一致：`0=快充`、`1=慢充`。金额单位为人民币元，时间接受 A
+权威文档推荐的 ISO 8601 或 Repository 当前使用的 epoch 毫秒；`0` 表示对应事件尚未
+发生。所有关联字段应在同一查询快照中批量生成，禁止客户端逐行调用用户专属接口。
+
+### 状态、支付与计费口径
+
+| 订单状态 | 界面文案 | `paymentStatus` | `amountKind` | 时间约束 |
+|---|---|---|---|---|
+| `RESERVED` | 已预约 | `NOT_DUE` | `NONE` | 只有 `createdAt`，其余时间为 0 |
+| `CHARGING` | 充电中 | `NOT_DUE` | `ESTIMATED` | `startTime>0`，停止/结算为 0 |
+| `WAIT_SETTLEMENT` | 待支付 | `UNPAID` | `FINAL` | 开始/停止时间大于 0，结算为 0 |
+| `FINISHED` | 已完成 | `PAID` | `FINAL` | 开始/停止/结算时间均大于 0 |
+
+- “未到结算”不是欠费；它表示订单尚未生成最终账单。“待支付”才表示服务端已停止
+  充电并确定最终费用，但扣款/完结尚未成功。
+- `CHARGING` 的 `energyKwh/amount/durationSeconds` 必须由服务端按 `generatedAt` 实时
+  计算，与用户侧 `order.status` 口径一致；客户端明确标“预估”，不得计入营收。
+- `WAIT_SETTLEMENT` 与 `FINISHED` 的 `amount` 是最终金额；只有 `FINISHED/PAID` 的
+  金额进入 `admin.revenue.summary/trend`。`platformSummary.paidAmount` 必须与该口径
+  一致，不包含待支付金额。
+- `platformSummary` 是不受本次分页和筛选影响的全平台快照；四个状态数量之和必须
+  等于 `totalOrders`。列表的 `total` 仅表示当前筛选条件匹配数。
+- 当前状态机没有独立支付流水、退款或取消状态，因此本提交不虚构“支付失败/已退款/
+  已取消”。后续增加这些流程时，应先由成员 A 冻结状态及收入冲正规则。
+
+### 管理边界与跨端验收
+
+- 本页面是只读运营追踪。管理员代替用户停止、结算、改金额或删订单都会影响设备
+  释放、余额、营收和审计，当前没有服务端权限/幂等/回滚规则，因此不提供这些按钮。
+- 排序只改变当前页显示，真实 `orderId` 存在实体角色中；选择详情不依赖视图行号。
+- 请求失败或响应的状态、支付、时间交叉约束不一致时，整页进入错误状态，不展示
+  部分拼接数据；刷新成功后才替换旧结果。
+- 跨端验收应按一次完整流程核对：预约后管理端出现 `RESERVED`；开始后为
+  `CHARGING/ESTIMATED`；停止后为 `WAIT_SETTLEMENT/UNPAID` 且金额固定；余额不足
+  结算仍保持待支付；充值并结算后为 `FINISHED/PAID`，同一最终 `amount` 进入营收，
+  关联桩恢复空闲。
+- 要求管理员已登录；未登录返回 `1003`，参数错误返回 `1001`，聚合失败返回 `5000`。
+
 ## 会话规则
 
 - 当前版本不使用 token，服务端在登录成功后把 `adminId` 绑定到该 TCP 连接。

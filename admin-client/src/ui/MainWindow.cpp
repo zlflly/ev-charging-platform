@@ -10,6 +10,7 @@
 #include "ui/UserManagementPage.h"
 #include "ui/RevenueStatisticsPage.h"
 #include "ui/OperationsOverviewPage.h"
+#include "ui/OrderManagementPage.h"
 #include "ui/theme/Theme.h"
 
 #include <QApplication>
@@ -30,6 +31,7 @@ const QStringList kPageTitles = {
     QStringLiteral("充电桩管理"),
     QStringLiteral("充电站管理"),
     QStringLiteral("用户管理"),
+    QStringLiteral("订单管理"),
     QStringLiteral("营收统计"),
 };
 
@@ -38,6 +40,7 @@ const QStringList kPageSubtitles = {
     QStringLiteral("查询充电桩状态并执行受控运维操作"),
     QStringLiteral("维护站点资料并查看站内设备"),
     QStringLiteral("查询平台用户并管理账号状态"),
+    QStringLiteral("追踪用户、设备、计费与支付状态"),
     QStringLiteral("核对今日、本月、累计营收与趋势"),
 };
 
@@ -90,6 +93,8 @@ MainWindow::MainWindow(NetworkClient* network,
     pages_->addWidget(stationManagementPage_);
     userManagementPage_ = new UserManagementPage(api_, pages_);
     pages_->addWidget(userManagementPage_);
+    orderManagementPage_ = new OrderManagementPage(api_, pages_);
+    pages_->addWidget(orderManagementPage_);
     revenueStatisticsPage_ = new RevenueStatisticsPage(api_, pages_);
     pages_->addWidget(revenueStatisticsPage_);
     workspaceLayout->addWidget(pages_, 1);
@@ -157,7 +162,8 @@ QWidget* MainWindow::createSidebar()
     addNavigationButton(QStringLiteral("  充电桩管理"), 1);
     addNavigationButton(QStringLiteral("  充电站管理"), 2);
     addNavigationButton(QStringLiteral("  用户管理"), 3);
-    addNavigationButton(QStringLiteral("  营收统计"), 4);
+    addNavigationButton(QStringLiteral("  订单管理"), 4);
+    addNavigationButton(QStringLiteral("  营收统计"), 5);
     for (auto* button : navigationButtons_) {
         layout->addWidget(button);
     }
@@ -258,7 +264,10 @@ void MainWindow::switchPage(int pageIndex)
     if (pageIndex == 3 && session_->isAuthenticated() && userManagementPage_) {
         userManagementPage_->refresh();
     }
-    if (pageIndex == 4 && session_->isAuthenticated() && revenueStatisticsPage_) {
+    if (pageIndex == 4 && session_->isAuthenticated() && orderManagementPage_) {
+        orderManagementPage_->refresh();
+    }
+    if (pageIndex == 5 && session_->isAuthenticated() && revenueStatisticsPage_) {
         revenueStatisticsPage_->refresh();
     }
 }

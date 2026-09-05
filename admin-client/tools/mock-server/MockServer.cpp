@@ -147,6 +147,75 @@ QJsonArray mockUsers()
     };
 }
 
+QJsonArray mockOrders()
+{
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    const auto order = [](int orderId, int userId, const QString& phone,
+                          const QString& nickname, const QString& status,
+                          const QString& paymentStatus, const QString& amountKind,
+                          int stationId, const QString& stationName, int chargerId,
+                          const QString& chargerCode, int type, double powerKw,
+                          double price, double energy, double amount, qint64 createdAt,
+                          qint64 startTime, qint64 stopTime, qint64 settleTime,
+                          int durationSeconds) {
+        return QJsonObject {
+            {QStringLiteral("orderId"), orderId},
+            {QStringLiteral("userId"), userId},
+            {QStringLiteral("phone"), phone},
+            {QStringLiteral("nickname"), nickname},
+            {QStringLiteral("status"), status},
+            {QStringLiteral("paymentStatus"), paymentStatus},
+            {QStringLiteral("amountKind"), amountKind},
+            {QStringLiteral("stationId"), stationId},
+            {QStringLiteral("stationName"), stationName},
+            {QStringLiteral("chargerId"), chargerId},
+            {QStringLiteral("chargerCode"), chargerCode},
+            {QStringLiteral("type"), type},
+            {QStringLiteral("powerKw"), powerKw},
+            {QStringLiteral("pricePerKwh"), price},
+            {QStringLiteral("energyKwh"), energy},
+            {QStringLiteral("amount"), amount},
+            {QStringLiteral("createdAt"), static_cast<double>(createdAt)},
+            {QStringLiteral("startTime"), static_cast<double>(startTime)},
+            {QStringLiteral("stopTime"), static_cast<double>(stopTime)},
+            {QStringLiteral("settleTime"), static_cast<double>(settleTime)},
+            {QStringLiteral("durationSeconds"), durationSeconds},
+        };
+    };
+    return {
+        order(9010, 6, QStringLiteral("15100001234"), QStringLiteral("测试用户"),
+              QStringLiteral("RESERVED"), QStringLiteral("NOT_DUE"), QStringLiteral("NONE"),
+              3, QStringLiteral("西山运营站"), 1009, QStringLiteral("CP-009"),
+              protocol::ChargerTypeFast, 120.0, 1.60, 0.0, 0.0,
+              now - 600000, 0, 0, 0, 0),
+        order(9009, 3, QStringLiteral("13800138003"), QStringLiteral("充电中用户"),
+              QStringLiteral("CHARGING"), QStringLiteral("NOT_DUE"), QStringLiteral("ESTIMATED"),
+              2, QStringLiteral("中关村科技园站"), 1007, QStringLiteral("CP-007"),
+              protocol::ChargerTypeFast, 120.0, 1.80, 176.0, 316.80,
+              now - 7200000, now - 6600000, 0, 0, 6600),
+        order(9008, 5, QStringLiteral("18688886666"), QStringLiteral("待结算用户"),
+              QStringLiteral("WAIT_SETTLEMENT"), QStringLiteral("UNPAID"), QStringLiteral("FINAL"),
+              1, QStringLiteral("良乡大学城站"), 1002, QStringLiteral("CP-002"),
+              protocol::ChargerTypeSlow, 7.0, 1.50, 11.20, 16.80,
+              now - 10800000, now - 10500000, now - 3300000, 0, 7200),
+        order(9007, 2, QStringLiteral("13800138002"), QStringLiteral("用户8002"),
+              QStringLiteral("FINISHED"), QStringLiteral("PAID"), QStringLiteral("FINAL"),
+              1, QStringLiteral("良乡大学城站"), 1001, QStringLiteral("CP-001"),
+              protocol::ChargerTypeFast, 120.0, 1.50, 42.40, 63.60,
+              now - 86400000, now - 85800000, now - 84000000, now - 83700000, 1800),
+        order(9006, 1, QStringLiteral("13800138001"), QStringLiteral("用户8001"),
+              QStringLiteral("FINISHED"), QStringLiteral("PAID"), QStringLiteral("FINAL"),
+              2, QStringLiteral("中关村科技园站"), 1005, QStringLiteral("CP-005"),
+              protocol::ChargerTypeFast, 120.0, 1.80, 53.50, 96.30,
+              now - 172800000, now - 172200000, now - 170400000, now - 170100000, 1800),
+        order(9005, 6, QStringLiteral("15100001234"), QStringLiteral("测试用户"),
+              QStringLiteral("FINISHED"), QStringLiteral("PAID"), QStringLiteral("FINAL"),
+              3, QStringLiteral("西山运营站"), 1010, QStringLiteral("CP-010"),
+              protocol::ChargerTypeSlow, 7.0, 1.60, 8.00, 12.80,
+              now - 259200000, now - 258900000, now - 255300000, now - 255000000, 3600),
+    };
+}
+
 double mockRevenueForDate(const QDate& date)
 {
     if (date.dayOfYear() % 6 == 0) return 0.0;
@@ -176,6 +245,7 @@ public:
         , stations_(mockStations())
         , chargers_(mockChargers())
         , users_(mockUsers())
+        , orders_(mockOrders())
     {
         connect(&server_, &QTcpServer::newConnection, this, [this] {
             while (auto* socket = server_.nextPendingConnection()) {
@@ -340,6 +410,106 @@ private:
                     {QStringLiteral("account"), QStringLiteral("admin")},
                     {QStringLiteral("displayName"), QStringLiteral("系统管理员")},
                 });
+            }
+        } else if (action == QString::fromUtf8(
+                       protocol::action::kAdminOrderList)) {
+            if (adminIds_.value(socket) <= 0) {
+                response.insert(QStringLiteral("code"), protocol::CodeNotLoggedIn);
+                response.insert(QStringLiteral("message"), QStringLiteral("administrator login required"));
+            } else {
+                const QJsonValue pageValue = requestData.value(QStringLiteral("page"));
+                const QJsonValue sizeValue = requestData.value(QStringLiteral("pageSize"));
+                const QJsonValue keywordValue = requestData.value(QStringLiteral("keyword"));
+                const QJsonValue statusValue = requestData.value(QStringLiteral("status"));
+                const QJsonValue paymentValue = requestData.value(QStringLiteral("paymentStatus"));
+                const double pageNumber = pageValue.toDouble(-1.0);
+                const double sizeNumber = sizeValue.toDouble(-1.0);
+                const QString keyword = keywordValue.toString().trimmed();
+                const QString status = statusValue.toString();
+                const QString payment = paymentValue.toString();
+                const auto validStatus = [](const QString& value) {
+                    return value == QStringLiteral("ALL") || value == QStringLiteral("RESERVED")
+                        || value == QStringLiteral("CHARGING")
+                        || value == QStringLiteral("WAIT_SETTLEMENT")
+                        || value == QStringLiteral("FINISHED");
+                };
+                const auto validPayment = [](const QString& value) {
+                    return value == QStringLiteral("ALL") || value == QStringLiteral("NOT_DUE")
+                        || value == QStringLiteral("UNPAID") || value == QStringLiteral("PAID");
+                };
+                const bool valid = requestData.size() == 5 && pageValue.isDouble()
+                    && std::floor(pageNumber) == pageNumber && pageNumber >= 1.0
+                    && sizeValue.isDouble() && std::floor(sizeNumber) == sizeNumber
+                    && sizeNumber >= 1.0 && sizeNumber <= 100.0
+                    && keywordValue.isString() && keyword.size() <= 50
+                    && statusValue.isString() && validStatus(status)
+                    && paymentValue.isString() && validPayment(payment);
+                if (!valid) {
+                    response.insert(QStringLiteral("code"), protocol::CodeBadRequest);
+                    response.insert(QStringLiteral("message"), QStringLiteral("订单查询参数不符合协议"));
+                } else {
+                    const qint64 generatedAt = QDateTime::currentMSecsSinceEpoch();
+                    QJsonArray filtered;
+                    qint64 reserved = 0, charging = 0, waiting = 0, finished = 0;
+                    double paidAmount = 0.0;
+                    for (const QJsonValue value : orders_) {
+                        QJsonObject current = value.toObject();
+                        const QString currentStatus = current.value(QStringLiteral("status")).toString();
+                        if (currentStatus == QStringLiteral("RESERVED")) ++reserved;
+                        else if (currentStatus == QStringLiteral("CHARGING")) {
+                            ++charging;
+                            const qint64 startTime = static_cast<qint64>(
+                                current.value(QStringLiteral("startTime")).toDouble());
+                            const qint64 seconds = qMax<qint64>(0, (generatedAt - startTime) / 1000);
+                            const double energy = seconds / 3600.0
+                                * current.value(QStringLiteral("powerKw")).toDouble() * 0.8;
+                            current.insert(QStringLiteral("durationSeconds"), seconds);
+                            current.insert(QStringLiteral("energyKwh"), energy);
+                            current.insert(QStringLiteral("amount"), energy
+                                * current.value(QStringLiteral("pricePerKwh")).toDouble());
+                        } else if (currentStatus == QStringLiteral("WAIT_SETTLEMENT")) ++waiting;
+                        else {
+                            ++finished;
+                            paidAmount += current.value(QStringLiteral("amount")).toDouble();
+                        }
+                        const QString searchable = QStringLiteral("%1 %2 %3 %4 %5")
+                            .arg(current.value(QStringLiteral("orderId")).toVariant().toString(),
+                                 current.value(QStringLiteral("phone")).toString(),
+                                 current.value(QStringLiteral("nickname")).toString(),
+                                 current.value(QStringLiteral("stationName")).toString(),
+                                 current.value(QStringLiteral("chargerCode")).toString());
+                        if ((!keyword.isEmpty() && !searchable.contains(keyword, Qt::CaseInsensitive))
+                            || (status != QStringLiteral("ALL") && currentStatus != status)
+                            || (payment != QStringLiteral("ALL")
+                                && current.value(QStringLiteral("paymentStatus")).toString() != payment)) {
+                            continue;
+                        }
+                        filtered.append(current);
+                    }
+                    const int page = static_cast<int>(pageNumber);
+                    const int pageSize = static_cast<int>(sizeNumber);
+                    const int start = (page - 1) * pageSize;
+                    QJsonArray paged;
+                    for (int index = start; index < filtered.size()
+                         && index < start + pageSize; ++index) {
+                        paged.append(filtered.at(index));
+                    }
+                    response.insert(QStringLiteral("data"), QJsonObject {
+                        {QStringLiteral("orders"), paged},
+                        {QStringLiteral("total"), filtered.size()},
+                        {QStringLiteral("page"), page},
+                        {QStringLiteral("pageSize"), pageSize},
+                        {QStringLiteral("generatedAt"), static_cast<double>(generatedAt)},
+                        {QStringLiteral("platformSummary"), QJsonObject {
+                            {QStringLiteral("totalOrders"), orders_.size()},
+                            {QStringLiteral("reservedCount"), reserved},
+                            {QStringLiteral("chargingCount"), charging},
+                            {QStringLiteral("waitSettlementCount"), waiting},
+                            {QStringLiteral("finishedCount"), finished},
+                            {QStringLiteral("paidAmount"), paidAmount},
+                        }},
+                    });
+                }
             }
         } else if (action == QString::fromUtf8(
                        protocol::action::kAdminUserList)) {
@@ -979,6 +1149,7 @@ private:
     QJsonArray stations_;
     QJsonArray chargers_;
     QJsonArray users_;
+    QJsonArray orders_;
     QHash<QTcpSocket*, QByteArray> buffers_;
     QHash<QTcpSocket*, qint64> adminIds_;
 };
