@@ -3,6 +3,7 @@
 #include "repository/ChargerRepository.h"
 #include "repository/StationRepository.h"
 #include "protocol/ProtocolHelper.h"
+#include <QJsonArray>
 #include <QDebug>
 #include <QDateTime>
 #include <QRegularExpression>
@@ -72,7 +73,7 @@ QJsonObject MLService::handleOrdersExport(const QJsonObject& data, QTcpSocket* s
         orderObj["stationId"] = order.stationId;
         orderObj["chargerId"] = order.chargerId;
         orderObj["chargerType"] = charger.type;  // 0=快充, 1=慢充
-        orderObj["power"] = charger.power;
+        orderObj["power"] = charger.powerKw;
 
         // 时间字段（ISO 8601格式）
         // 注意：order.createdAt对应预约时间

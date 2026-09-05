@@ -1,3 +1,10 @@
+# === user-client 侧（本地 main 原有） ===
+/.deps/
+/user-client/local.env
+/user-client/build/
+/.impeccable/review/
+
+# === server 侧（fengshu-server-db 合入） ===
 # Development reference materials
 reference-member2/
 reference-member3/
@@ -13,6 +20,8 @@ cmake-build-*/
 # Build artifacts
 server/build/
 server/cmake-build-*/
+user-client/build/
+admin-client/build/
 **/CMakeCache.txt
 **/CMakeFiles/
 **/cmake_install.cmake
@@ -28,14 +37,14 @@ ui_*.h
 qrc_*.cpp
 
 # Binaries
+# 注意：不要写 /user-client、/admin-client。Git 的目录名与可执行文件同名，
+# 这两条会把整个客户端源码目录忽略掉；客户端产物已由 build/ 规则覆盖。
 *.exe
 *.out
 *.app
-ev-server
-mock-server
+/ev-server
+/mock-server
 *-smoke-test
-user-client
-admin-client
 
 # Database
 *.db

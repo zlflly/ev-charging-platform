@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <style>
+    html, body, #map { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #eaf0f6; }
+    .amap-logo, .amap-copyright { opacity: .55; }
+    .station-node { width: 14px; height: 14px; border: 3px solid white; border-radius: 50%; background: #149b68; box-shadow: 0 3px 10px rgba(0,0,0,.14); }
+    .station-node.busy { background: #b66b08; }
+    .station-nearest { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .station-nearest__rank { width: 30px; height: 30px; border: 3px solid white; border-radius: 50%; background: #176cff; color: white; display: grid; place-items: center; font: 700 13px/1 "Noto Sans CJK SC", "Microsoft YaHei UI", sans-serif; box-shadow: 0 5px 14px rgba(0,0,0,.14); }
+    .station-nearest__card { padding: 6px 8px; border-radius: 8px; background: white; color: #14243a; box-shadow: 0 5px 16px rgba(0,0,0,.12); font: 650 11px/1.2 "Noto Sans CJK SC", "Microsoft YaHei UI", sans-serif; }
+    .station-nearest__availability { display: inline-block; margin-top: 3px; padding: 2px 5px; border-radius: 4px; background: #149b68; color: white; font-size: 9px; }
+    .station-nearest__availability.busy { background: #b66b08; }
+    .route-origin { width: 34px; height: 34px; border: 3px solid white; border-radius: 50%; background: #176cff; box-shadow: 0 8px 24px rgba(0,0,0,.16); position: relative; }
+    .route-origin::after { content: ''; position: absolute; left: 10px; top: 7px; width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 18px solid white; transform: rotate(42deg); }
+    .route-destination { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+    .route-destination__pin { width: 34px; height: 34px; border: 3px solid white; border-radius: 50% 50% 50% 0; background: #149b68; transform: rotate(-45deg); box-shadow: 0 8px 24px rgba(0,0,0,.16); display: grid; place-items: center; }
+    .route-destination__pin svg { width: 18px; height: 18px; transform: rotate(45deg); }
+    .route-destination__label { max-width: 190px; overflow: hidden; text-overflow: ellipsis; padding: 7px 10px; background: white; color: #14243a; border-radius: 10px; font: 600 12px/1.25 "Noto Sans CJK SC", "Microsoft YaHei UI", sans-serif; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+  </style>
+  <script>window._AMapSecurityConfig = { securityJsCode: '__AMAP_SECRET__' };</script>
+  <script src="https://webapi.amap.com/maps?v=2.0&key=__AMAP_KEY__"></script>
+</head>
+<body>
+<div id="map"></div>
+<script>
+  // 宿主端通过 document.title 判断在线地图是否真正可用，失败时切回本地绘制的地图。
+  const MAP_STATUS_READY = 'map-ready';
+  const MAP_STATUS_UNAVAILABLE = 'map-unavailable';
+
+  const supportsWebGl = () => {
+    try {
+      const probe = document.createElement('canvas');
+      return Boolean(probe.getContext('webgl') || probe.getContext('experimental-webgl'));
+    } catch (error) {
+      return false;
+    }
+  };
+
+  let map = null;
+  let stationMarkers = [];
+  let routeLine = null;
+  let routeMarkers = [];
+
+  window.setCenter = (lat, lng) => {
+    if (!map) return;
+    map.setZoomAndCenter(14, [Number(lng), Number(lat)], false, 300);
+  };
+
+  window.setStations = (items) => {
+    if (!map) return;
+    map.remove(stationMarkers);
+    stationMarkers = (items || []).map((item, index) => {
+      const safeName = String(item.name || '充电站').replace(/[&<>'"]/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+      const availability = item.available > 0 ? `${item.available}桩空闲` : '暂无空闲';
+      const content = index === 0
+        ? `<div class="station-nearest"><div class="station-nearest__rank">1</div><div class="station-nearest__card">${safeName}<br><span class="station-nearest__availability ${item.available > 0 ? '' : 'busy'}">${availability}</span></div></div>`
+        : `<div class="station-node ${item.available > 0 ? '' : 'busy'}"></div>`;
+      const marker = new AMap.Marker({
+        position: [item.longitude, item.latitude],
+        title: item.name,
+        content,
+        offset: new AMap.Pixel(index === 0 ? -18 : -10, index === 0 ? -18 : -10),
+        zIndex: index === 0 ? 120 : 100
+      });
+      marker.setMap(map);
+      return marker;
+    });
+    if (stationMarkers.length) map.setFitView(stationMarkers, false, [42,42,42,42], 15);
+  };
+
+  window.setRoute = (payload) => {
+    if (!map) return;
+    if (routeLine) map.remove(routeLine);
+    map.remove(routeMarkers);
+    routeMarkers = [];
+    const points = payload && payload.points ? payload.points : [];
+    const path = (points || []).map((p) => [p.lng, p.lat]);
+    if (!path.length) return;
+    routeLine = new AMap.Polyline({ path, strokeColor: '#176CFF', strokeWeight: 8, strokeOpacity: .96, lineJoin: 'round', showDir: true });
+    map.add(routeLine);
+    const origin = new AMap.Marker({
+      position: path[0],
+      content: '<div class="route-origin"></div>',
+      offset: new AMap.Pixel(-20, -20),
+      zIndex: 120
+    });
+    const label = String(payload.destination || '充电站').replace(/[&<>'"]/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+    const destination = new AMap.Marker({
+      position: path[path.length - 1],
+      content: `<div class="route-destination"><div class="route-destination__pin"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="white" d="M13.2 2 5.5 13h5L9.8 22l8.7-12h-5.2z"/></svg></div><div class="route-destination__label">${label}</div></div>`,
+      offset: new AMap.Pixel(-20, -42),
+      zIndex: 120
+    });
+    origin.setMap(map);
+    destination.setMap(map);
+    routeMarkers = [origin, destination];
+    map.setFitView([routeLine, ...routeMarkers], false, [90,48,64,48], 16);
+  };
+
+  const createMap = () => {
+    if (typeof AMap === 'undefined') {
+      console.error('高德 JS API 未加载，请检查 key 与网络。');
+      return null;
+    }
+    if (!supportsWebGl()) {
+      console.error('当前环境没有可用的 WebGL，高德 JS API 2.0 无法渲染。');
+      return null;
+    }
+    try {
+      return new AMap.Map('map', {
+        zoom: 13,
+        center: [116.171271, 39.735678],
+        viewMode: '2D',
+        mapStyle: 'amap://styles/whitesmoke',
+        showLabel: true
+      });
+    } catch (error) {
+      console.error('高德地图初始化失败：' + error);
+      return null;
+    }
+  };
+
+  map = createMap();
+  document.title = map ? MAP_STATUS_READY : MAP_STATUS_UNAVAILABLE;
+  if (map) {
+    // WebGL 上下文可能在渲染阶段才丢失，丢失后退回宿主端自绘地图。
+    map.on('webglcontextlost', () => { document.title = MAP_STATUS_UNAVAILABLE; });
+  }
+</script>
+</body>
+</html>

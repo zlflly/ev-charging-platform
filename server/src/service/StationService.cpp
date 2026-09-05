@@ -2,6 +2,7 @@
 #include "repository/StationRepository.h"
 #include "repository/ChargerRepository.h"
 #include "protocol/ProtocolHelper.h"
+#include <QJsonArray>
 #include <QDebug>
 #include <QtMath>
 
@@ -50,7 +51,7 @@ QJsonObject StationService::handleNearby(const QJsonObject& data, QTcpSocket* so
         }
 
         // 查询站点内的充电桩
-        QVector<repository::Charger> chargers = repository::ChargerRepository::findByStation(station.stationId);
+        QVector<repository::Charger> chargers = repository::ChargerRepository::findByStationId(station.stationId);
 
         int totalCount = chargers.size();
         int availableCount = 0;
@@ -117,7 +118,7 @@ QJsonObject StationService::handleDetail(const QJsonObject& data, QTcpSocket* so
     const auto& station = stationOpt.value();
 
     // 查询站点内的充电桩
-    QVector<repository::Charger> chargers = repository::ChargerRepository::findByStation(stationId);
+    QVector<repository::Charger> chargers = repository::ChargerRepository::findByStationId(stationId);
 
     // 构造充电桩列表
     QJsonArray chargersArray;
