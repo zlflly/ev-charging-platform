@@ -100,6 +100,7 @@ bool Database::createTables() {
             longitude REAL NOT NULL,
             pricePerKwh REAL NOT NULL,
             status INTEGER NOT NULL DEFAULT 0,
+            version INTEGER NOT NULL DEFAULT 1,
             createdAt INTEGER NOT NULL
         )
     )";
