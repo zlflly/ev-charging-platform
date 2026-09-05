@@ -30,11 +30,12 @@ struct StationInfo {
         station.stationId = static_cast<qint64>(
             json.value(QStringLiteral("stationId")).toDouble());
         station.name = json.value(QStringLiteral("name")).toString();
-        station.pricePerKwh = json.value(QStringLiteral("price")).toDouble();
-        station.totalChargers = json.value(QStringLiteral("totalChargers")).toInt();
+        station.pricePerKwh = json.value(QStringLiteral("pricePerKwh")).toDouble();
+        station.totalChargers = json.value(QStringLiteral("totalCount")).toInt();
         station.availableChargers =
-            json.value(QStringLiteral("availableChargers")).toInt();
-        station.distanceKm = json.value(QStringLiteral("distanceKm")).toDouble();
+            json.value(QStringLiteral("availableCount")).toInt();
+        // 服务端 distance 单位为米（协议冻结文档 5.5），展示层换算为公里。
+        station.distanceKm = json.value(QStringLiteral("distance")).toDouble() / 1000.0;
         station.latitude = json.value(QStringLiteral("latitude")).toDouble();
         station.longitude = json.value(QStringLiteral("longitude")).toDouble();
         station.address = json.value(QStringLiteral("address")).toString();

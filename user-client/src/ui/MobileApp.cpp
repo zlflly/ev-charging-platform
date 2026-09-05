@@ -38,6 +38,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QScrollArea>
+#include <QStackedLayout>
 #include <QStackedWidget>
 #include <QStyle>
 #include <QTimer>
@@ -615,27 +616,46 @@ void EnergyMapWidget::paintEvent(QPaintEvent*)
     }
 }
 
+namespace {
+constexpr auto kMapStatusReady = "map-ready";
+constexpr auto kMapStatusUnavailable = "map-unavailable";
+constexpr int kMapReadinessTimeoutMs = 12000;
+
+// 把地图页面里的 console 输出接到 Qt 日志，联调时能直接看到高德 key、域名白名单等报错。
+class MapPage final : public QWebEnginePage
+{
+public:
+    using QWebEnginePage::QWebEnginePage;
+
+protected:
+    void javaScriptConsoleMessage(JavaScriptConsoleMessageLevel level, const QString& message,
+                                  int lineNumber, const QString& sourceId) override
+    {
+        Q_UNUSED(lineNumber);
+        Q_UNUSED(sourceId);
+        if (level == InfoMessageLevel) return;
+        qWarning("[map] %s", qUtf8Printable(message));
+    }
+};
+} // namespace
+
 AmapWidget::AmapWidget(QWidget* parent) : QWidget(parent)
 {
     setMinimumHeight(180);
-    auto* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(0, 0, 0, 0);
+    mapStack_ = new QStackedLayout(this);
+    mapStack_->setContentsMargins(0, 0, 0, 0);
+    mapStack_->setStackingMode(QStackedLayout::StackOne);
+
+    // 离线地图始终存在：在线地图不可用时立刻有内容可显示，且数据一直同步。
+    fallback_ = new EnergyMapWidget;
+    fallback_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    mapStack_->addWidget(fallback_);
 
     const QString apiKey = qEnvironmentVariable(appConfig::kAmapJsApiKeyEnvironment);
-    if (apiKey.isEmpty()) {
-        fallback_ = new EnergyMapWidget;
-        fallback_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-        layout->addWidget(fallback_);
-        return;
-    }
+    if (apiKey.isEmpty()) return;
 
     QFile source(QStringLiteral(":/resources/home-map.html"));
-    if (!source.open(QIODevice::ReadOnly)) {
-        fallback_ = new EnergyMapWidget;
-        fallback_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-        layout->addWidget(fallback_);
-        return;
-    }
+    if (!source.open(QIODevice::ReadOnly)) return;
 
     QByteArray html = source.readAll();
     html.replace("__AMAP_KEY__", apiKey.toUtf8());
@@ -643,23 +663,64 @@ AmapWidget::AmapWidget(QWidget* parent) : QWidget(parent)
                  qEnvironmentVariable(appConfig::kAmapJsApiSecretEnvironment).toUtf8());
     webView_ = new QWebEngineView;
     webView_->setContextMenuPolicy(Qt::NoContextMenu);
-    webView_->page()->setBackgroundColor(QColor("#E9EFED"));
-    layout->addWidget(webView_);
+    auto* page = new MapPage(webView_);
+    page->setBackgroundColor(QColor("#E9EFED"));
+    webView_->setPage(page);
+    mapStack_->addWidget(webView_);
+    mapStack_->setCurrentWidget(webView_);
     liveMap_ = true;
+
+    // 高德 JS API 加载完才知道地图是否真的能渲染，超时则退回离线地图而不是留一片空白。
+    readinessTimeout_ = new QTimer(this);
+    readinessTimeout_->setSingleShot(true);
+    readinessTimeout_->setInterval(kMapReadinessTimeoutMs);
+    connect(readinessTimeout_, &QTimer::timeout, this, [this] {
+        fallBackToOfflineMap(QStringLiteral("在线地图加载超时"));
+    });
+    readinessTimeout_->start();
+
+    connect(webView_, &QWebEngineView::titleChanged, this, &AmapWidget::handleMapStatus);
     connect(webView_, &QWebEngineView::loadFinished, this, [this](bool ok) {
-        loaded_ = ok;
-        if (!ok) return;
-        const auto scripts = queuedScripts_;
-        queuedScripts_.clear();
-        for (const QString& script : scripts) runScript(script);
+        if (!ok) fallBackToOfflineMap(QStringLiteral("在线地图加载失败"));
     });
     webView_->setHtml(QString::fromUtf8(html), QUrl(QStringLiteral("https://localhost/")));
 }
 
+void AmapWidget::handleMapStatus(const QString& status)
+{
+    if (status == QLatin1String(kMapStatusUnavailable)) {
+        fallBackToOfflineMap(QStringLiteral("当前环境不支持在线地图渲染"));
+        return;
+    }
+    if (status != QLatin1String(kMapStatusReady) || ready_) return;
+    ready_ = true;
+    if (readinessTimeout_) readinessTimeout_->stop();
+    const auto scripts = queuedScripts_;
+    queuedScripts_.clear();
+    for (const QString& script : scripts) runScript(script);
+}
+
+void AmapWidget::fallBackToOfflineMap(const QString& reason)
+{
+    if (!liveMap_) return;
+    liveMap_ = false;
+    ready_ = false;
+    queuedScripts_.clear();
+    if (readinessTimeout_) readinessTimeout_->stop();
+    qWarning("[map] %s，已切换到离线地图", qUtf8Printable(reason));
+    fallback_->setCaption(reason + QStringLiteral("，已切换到简易地图"));
+    mapStack_->setCurrentWidget(fallback_);
+    if (webView_) {
+        webView_->hide();
+        webView_->deleteLater();
+        webView_ = nullptr;
+    }
+}
+
 void AmapWidget::runScript(const QString& script)
 {
-    if (!webView_) return;
-    if (!loaded_) {
+    if (!webView_ || !liveMap_) return;
+    if (!ready_) {
         queuedScripts_.append(script);
         return;
     }
@@ -668,7 +729,7 @@ void AmapWidget::runScript(const QString& script)
 
 void AmapWidget::setStations(const QList<StationInfo>& stations)
 {
-    if (fallback_) fallback_->setStations(stations);
+    fallback_->setStations(stations);
     QJsonArray items;
     for (const StationInfo& station : stations) {
         if (qFuzzyIsNull(station.latitude) || qFuzzyIsNull(station.longitude)) continue;
@@ -685,14 +746,14 @@ void AmapWidget::setStations(const QList<StationInfo>& stations)
 
 void AmapWidget::setCenter(double latitude, double longitude, const QString& label)
 {
-    if (fallback_ && !label.isEmpty()) fallback_->setCaption(label);
+    if (!label.isEmpty()) fallback_->setCaption(label);
     runScript(QStringLiteral("window.setCenter(%1,%2)")
         .arg(latitude, 0, 'f', 7).arg(longitude, 0, 'f', 7));
 }
 
 void AmapWidget::setRoute(const RouteResult& route, const QString& destinationLabel)
 {
-    if (fallback_) fallback_->setRoute(route);
+    fallback_->setRoute(route);
     QJsonArray points;
     for (const QPointF& point : route.path) {
         QJsonObject value;
@@ -891,6 +952,11 @@ MobileApp::MobileApp(NetworkClient* network, QWidget* parent)
     layout->addWidget(pages_, 1);
     layout->addWidget(bottomNav_);
     setCentralWidget(root);
+
+    // 充电中每 3 秒向服务端拉取 order.status 的实时电量与金额。
+    chargingPollTimer_ = new QTimer(this);
+    chargingPollTimer_->setInterval(3000);
+    connect(chargingPollTimer_, &QTimer::timeout, this, &MobileApp::pollChargingStatus);
 
     connect(network_, &NetworkClient::connected, this, [this] { updateConnectionState(true); });
     connect(network_, &NetworkClient::disconnected, this, [this] { updateConnectionState(false); });
@@ -1517,6 +1583,10 @@ QWidget* MobileApp::buildNavigationPage()
     navigationStatus_ = label(QStringLiteral("同步中"), "StatusInfo");
     navigationStatus_->setWordWrap(false);
     navigationStatus_->setAlignment(Qt::AlignCenter);
+    // 状态文案长度会随服务端状态变化：让标签按内容自然伸缩，但限制在右上角可控范围内。
+    navigationStatus_->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
+    navigationStatus_->setMinimumWidth(0);
+    navigationStatus_->setMaximumWidth(112);
     stationRow->addWidget(navigationStatus_,0,Qt::AlignTop);
     panelLayout->addLayout(stationRow);
 
@@ -1692,7 +1762,7 @@ QWidget* MobileApp::buildProfilePage()
     layout->addWidget(label(QStringLiteral("昵称"), "SectionTitle")); auto* nickRow = new QHBoxLayout; nickRow->setSpacing(8); nicknameInput_ = new QLineEdit; nicknameInput_->setPlaceholderText(QStringLiteral("2–20 个字符")); nicknameButton_ = button(QStringLiteral("保存"), "Secondary"); nicknameButton_->setFixedWidth(84); nickRow->addWidget(nicknameInput_); nickRow->addWidget(nicknameButton_); layout->addLayout(nickRow);
     layout->addWidget(label(QStringLiteral("充值"), "SectionTitle")); auto* chargeRow = new QHBoxLayout; chargeRow->setSpacing(8); rechargeInput_ = new QLineEdit; rechargeInput_->setPlaceholderText(QStringLiteral("金额")); rechargeInput_->setValidator(new QDoubleValidator(0.01,100000.0,2,rechargeInput_)); rechargeButton_ = button(QStringLiteral("充值"), "Primary"); rechargeButton_->setFixedWidth(84); chargeRow->addWidget(rechargeInput_); chargeRow->addWidget(rechargeButton_); layout->addLayout(chargeRow);
     profileNotice_ = label(QString(), "Muted"); layout->addWidget(profileNotice_); layout->addSpacing(10); auto* logout = button(QStringLiteral("退出登录"), "Danger"); layout->addWidget(logout); layout->addStretch(); scroll->setWidget(body); outer->addWidget(scroll);
-    connect(nicknameButton_,&QPushButton::clicked,this,&MobileApp::updateProfile); connect(rechargeButton_,&QPushButton::clicked,this,&MobileApp::recharge); connect(logout,&QPushButton::clicked,this,[this]{Session::instance().logout(); phoneInput_->clear(); setNotice(loginNotice_,QStringLiteral("已安全退出")); showPage(LoginPage);}); return page;
+    connect(nicknameButton_,&QPushButton::clicked,this,&MobileApp::updateProfile); connect(rechargeButton_,&QPushButton::clicked,this,&MobileApp::recharge); connect(logout,&QPushButton::clicked,this,[this]{Session::instance().logout(); chargingPollTimer_->stop(); activeOrder_=OrderInfo{}; phoneInput_->clear(); setNotice(loginNotice_,QStringLiteral("已安全退出")); showPage(LoginPage);}); return page;
 }
 
 QWidget* MobileApp::buildBottomNavigation()
@@ -1722,14 +1792,14 @@ void MobileApp::setNotice(QLabel* target,const QString& text,bool error){target-
 void MobileApp::attemptLogin()
 {
     const QString phone=phoneInput_->text().trimmed(); if(!QRegularExpression(QStringLiteral("^1\\d{10}$")).match(phone).hasMatch()){setNotice(loginNotice_,QStringLiteral("请输入有效的 11 位手机号"),true);return;} setBusy(loginButton_,true,QStringLiteral("登录 / 自动注册")); setNotice(loginNotice_,QStringLiteral("正在验证账号…")); QJsonObject data;data.insert(QStringLiteral("phone"),phone);
-    network_->sendRequest(QString::fromLatin1(protocol::action::kUserLogin),data,[this,phone](const protocol::Response& r){setBusy(loginButton_,false,QStringLiteral("登录 / 自动注册"));if(!r.isOk()){setNotice(loginNotice_,protocol::describeError(r.code,r.message),true);return;}const auto d=r.data;Session::instance().setUser(qint64(d.value(QStringLiteral("userId")).toDouble()),d.value(QStringLiteral("phone")).toString(phone),d.value(QStringLiteral("nickname")).toString(QStringLiteral("车主用户")),d.value(QStringLiteral("avatarUrl")).toString(),d.value(QStringLiteral("balance")).toDouble(),d.value(QStringLiteral("status")).toString());refreshSessionViews();showPage(HomePage);});
+    network_->sendRequest(QString::fromLatin1(protocol::action::kUserLogin),data,[this,phone](const protocol::Response& r){setBusy(loginButton_,false,QStringLiteral("登录 / 自动注册"));if(!r.isOk()){setNotice(loginNotice_,protocol::describeError(r.code,r.message),true);return;}const auto d=r.data;const int userStatus=d.value(QStringLiteral("status")).toInt(0);Session::instance().setUser(qint64(d.value(QStringLiteral("userId")).toDouble()),d.value(QStringLiteral("phone")).toString(phone),d.value(QStringLiteral("nickname")).toString(QStringLiteral("车主用户")),d.value(QStringLiteral("avatar")).toString(),d.value(QStringLiteral("balance")).toDouble(),userStatus==1?QStringLiteral("FROZEN"):QStringLiteral("NORMAL"));refreshSessionViews();showPage(HomePage);});
 }
 
 void MobileApp::locateAddress(){const QString address=addressInput_->text().trimmed();if(address.size()<2){setNotice(homeNotice_,QStringLiteral("请输入完整一些的位置"),true);return;}setBusy(locateButton_,true,QStringLiteral("更新位置"));setNotice(homeNotice_,QStringLiteral("正在解析位置…"));geocoder_->geocode(address);}
 
 void MobileApp::requestNearbyStations()
 {
-    if(!Session::instance().hasLocation()){setNotice(homeNotice_,QStringLiteral("请先输入位置"),true);return;} setNotice(homeNotice_,QStringLiteral("正在同步附近站点…")); QJsonObject data;data.insert(QStringLiteral("latitude"),Session::instance().latitude());data.insert(QStringLiteral("longitude"),Session::instance().longitude());
+    if(!Session::instance().hasLocation()){setNotice(homeNotice_,QStringLiteral("请先输入位置"),true);return;} setNotice(homeNotice_,QStringLiteral("正在同步附近站点…")); QJsonObject data;data.insert(QStringLiteral("latitude"),Session::instance().latitude());data.insert(QStringLiteral("longitude"),Session::instance().longitude());data.insert(QStringLiteral("radius"),50000.0);
     network_->sendRequest(QString::fromLatin1(protocol::action::kStationNearby),data,[this](const protocol::Response&r){if(!r.isOk()){setNotice(homeNotice_,protocol::describeError(r.code,r.message),true);renderStationList({});return;}const auto stations=StationInfo::fromJsonArray(r.data.value(QStringLiteral("stations")).toArray());renderStationList(stations);setNotice(homeNotice_,QString());});
 }
 
@@ -1850,7 +1920,7 @@ void MobileApp::applyHomeFilter()
 
         auto* metrics = new QVBoxLayout;
         metrics->setSpacing(1);
-        auto* price = label(QStringLiteral("¥ %1").arg(station.pricePerKwh, 0, 'f', 2), "StationPrice");
+        auto* price = label(station.pricePerKwh > 0.0 ? QStringLiteral("¥ %1").arg(station.pricePerKwh, 0, 'f', 2) : QStringLiteral("价格以站点为准"), "StationPrice");
         price->setWordWrap(false);
         metrics->addWidget(price);
         metrics->addWidget(label(QStringLiteral("电价 / 度"), "StationCaption"));
@@ -1903,7 +1973,7 @@ void MobileApp::requestStationDetail(qint64 stationId, bool navigateAfter)
 
 void MobileApp::renderStationDetail(const StationDetail& d)
 {
-    currentStation_=d;preferredCharger_=ChargerInfo{};int fastCount=0;int slowCount=0;for(const auto&c:d.chargers){if(c.type==protocol::ChargerTypeFast)++fastCount;else ++slowCount;if(!preferredCharger_.valid()&&c.isIdle())preferredCharger_=c;}detailName_->setText(d.station.name);detailMeta_->setText(d.station.availableChargers>0?QStringLiteral("可充电"):QStringLiteral("暂无空闲"));detailMeta_->setObjectName(d.station.availableChargers>0?QStringLiteral("StatusOk"):QStringLiteral("StatusWarn"));detailMeta_->style()->unpolish(detailMeta_);detailMeta_->style()->polish(detailMeta_);detailAddress_->setText(d.address);detailPrice_->setText(QStringLiteral("¥ %1/度").arg(d.station.pricePerKwh,0,'f',2));detailAvailability_->setText(QStringLiteral("%1").arg(d.station.availableChargers));detailTotal_->setText(QString::number(d.chargers.size()));detailFast_->setText(QString::number(fastCount));detailSlow_->setText(QString::number(slowCount));setNotice(detailNotice_,d.chargers.isEmpty()?QStringLiteral("暂无充电桩"):QString());clearLayout(chargerListLayout_);
+    currentStation_=d;preferredCharger_=ChargerInfo{};int fastCount=0;int slowCount=0;double maxPowerKw=0.0;for(const auto&c:d.chargers){if(c.type==protocol::ChargerTypeFast)++fastCount;else ++slowCount;maxPowerKw=qMax(maxPowerKw,c.powerKw);if(!preferredCharger_.valid()&&c.isIdle())preferredCharger_=c;}currentStation_.station.fastChargers=fastCount;currentStation_.station.slowChargers=slowCount;currentStation_.station.maxPowerKw=maxPowerKw;detailName_->setText(d.station.name);detailMeta_->setText(d.station.availableChargers>0?QStringLiteral("可充电"):QStringLiteral("暂无空闲"));detailMeta_->setObjectName(d.station.availableChargers>0?QStringLiteral("StatusOk"):QStringLiteral("StatusWarn"));detailMeta_->style()->unpolish(detailMeta_);detailMeta_->style()->polish(detailMeta_);detailAddress_->setText(d.address);detailPrice_->setText(QStringLiteral("¥ %1/度").arg(d.station.pricePerKwh,0,'f',2));detailAvailability_->setText(QStringLiteral("%1").arg(d.station.availableChargers));detailTotal_->setText(QString::number(d.chargers.size()));detailFast_->setText(QString::number(fastCount));detailSlow_->setText(QString::number(slowCount));setNotice(detailNotice_,d.chargers.isEmpty()?QStringLiteral("暂无充电桩"):QString());clearLayout(chargerListLayout_);
     for(const auto&c:d.chargers){auto* row=surface();auto*l=new QHBoxLayout(row);l->setContentsMargins(16,15,12,15);auto* text=new QVBoxLayout;text->setSpacing(4);text->addWidget(label(c.code.isEmpty()?QStringLiteral("充电桩 %1").arg(c.chargerId):c.code,"SectionTitle"));text->addWidget(label(QStringLiteral("%1 · %2 kW · %3").arg(c.typeLabel()).arg(c.powerKw,0,'f',0).arg(c.statusLabel()),"Muted"));l->addLayout(text,1);auto* choose=button(QStringLiteral("查看"),"Secondary");choose->setFixedSize(72,46);l->addWidget(choose);connect(choose,&QPushButton::clicked,this,[this,c]{showChargerDetail(c);});chargerListLayout_->addWidget(row);}chargerListLayout_->addStretch();
 }
 
@@ -1959,6 +2029,7 @@ void MobileApp::showNavigation()
     navigationStatus_->setObjectName(available ? QStringLiteral("StatusOk") : QStringLiteral("StatusWarn"));
     navigationStatus_->style()->unpolish(navigationStatus_);
     navigationStatus_->style()->polish(navigationStatus_);
+    navigationStatus_->adjustSize();
     navigationAvailability_->setText(QStringLiteral("%1 / %2")
         .arg(currentStation_.station.availableChargers)
         .arg(currentStation_.station.totalChargers));
@@ -2084,10 +2155,13 @@ void MobileApp::renderOrder(const OrderInfo& o)
         chargingAction_->setText(QStringLiteral("查找充电站"));chargingAction_->setObjectName(QStringLiteral("Primary"));chargingOrderButton_->setEnabled(false);chargingAction_->style()->unpolish(chargingAction_);chargingAction_->style()->polish(chargingAction_);return;
     }
 
-    const double pct=o.progressPercent>=0?o.progressPercent:(o.targetEnergyKwh>0?o.energyKwh/o.targetEnergyKwh*100.0:0.0);
+    // 服务端不返回目标电量/进度，展示层用默认 60 kWh 容量把真实电量映射为进度；
+    // 电量与金额本身始终来自服务端（order.status 轮询 / 订单响应）。
+    const double capacityKwh=o.targetEnergyKwh>0?o.targetEnergyKwh:60.0;
+    const double pct=o.progressPercent>=0?o.progressPercent:qBound(0.0,o.energyKwh/capacityKwh*100.0,100.0);
     const qint64 duration=o.durationMs();
     qint64 remaining=o.remainingSeconds;
-    if(remaining<=0&&o.targetEnergyKwh>o.energyKwh&&o.powerKw>0){remaining=qint64((o.targetEnergyKwh-o.energyKwh)/o.powerKw*3600.0);}
+    if(remaining<=0&&capacityKwh>o.energyKwh&&o.powerKw>0){remaining=qint64((capacityKwh-o.energyKwh)/o.powerKw*3600.0);}
     const double fee=state==OrderInfo::StatusWaitSettlement?o.amount:o.estimatedAmount;
     gauge_->setValue(pct,state==OrderInfo::StatusCharging?QStringLiteral("%1%").arg(qRound(pct)):stateText,state==OrderInfo::StatusCharging?QStringLiteral("极速充电中"):QStringLiteral("服务端订单状态"));
     chargingStation_->setText(o.stationName);chargingMetrics_->setText(QStringLiteral("设备编号 %1").arg(o.chargerCode));
@@ -2099,6 +2173,35 @@ void MobileApp::renderOrder(const OrderInfo& o)
     chargingElectrical_->setText(o.voltageV>0&&o.currentA>0?QStringLiteral("电压 %1 V · 电流 %2 A").arg(o.voltageV,0,'f',0).arg(o.currentA,0,'f',0):QStringLiteral("电压、电流待服务端返回"));
     powerWave_->setSamples(o.powerTrend);energyWave_->setSamples(o.energyTrend);chargingOrderButton_->setEnabled(true);
     if(state==OrderInfo::StatusReserved)chargingAction_->setText(QStringLiteral("开始充电"));else if(state==OrderInfo::StatusCharging)chargingAction_->setText(QStringLiteral("停止充电"));else if(state==OrderInfo::StatusWaitSettlement)chargingAction_->setText(QStringLiteral("确认结算"));else chargingAction_->setText(QStringLiteral("查看附近站点"));chargingAction_->setObjectName(state==OrderInfo::StatusCharging?QStringLiteral("Danger"):QStringLiteral("Primary"));chargingAction_->style()->unpolish(chargingAction_);chargingAction_->style()->polish(chargingAction_);
+    if(state==OrderInfo::StatusCharging)chargingPollTimer_->start();else chargingPollTimer_->stop();
+}
+
+void MobileApp::pollChargingStatus()
+{
+    if (statusPollInFlight_ || activeOrder_.statusEnum() != OrderInfo::StatusCharging) {
+        return;
+    }
+    statusPollInFlight_ = true;
+    QJsonObject data;
+    data.insert(QStringLiteral("orderId"), double(activeOrder_.orderId));
+    network_->sendRequest(QString::fromLatin1(protocol::action::kOrderStatus), data,
+        [this](const protocol::Response& r) {
+            statusPollInFlight_ = false;
+            if (!r.isOk()) {
+                return;
+            }
+            const OrderInfo latest = orderFromPayload(r.data);
+            if (!latest.valid() || latest.orderId != activeOrder_.orderId) {
+                return;
+            }
+            activeOrder_.energyKwh = latest.energyKwh;
+            activeOrder_.amount = latest.amount;
+            activeOrder_.estimatedAmount = latest.amount;
+            activeOrder_.startTimeMs = latest.startTimeMs;
+            activeOrder_.stopTimeMs = latest.stopTimeMs;
+            activeOrder_.status = latest.status;
+            renderOrder(activeOrder_);
+        });
 }
 
 void MobileApp::performOrderAction(const QString& action,QPushButton* source)

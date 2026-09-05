@@ -26,22 +26,31 @@
 <body>
 <div id="map"></div>
 <script>
-  const map = new AMap.Map('map', {
-    zoom: 13,
-    center: [116.171271, 39.735678],
-    viewMode: '2D',
-    mapStyle: 'amap://styles/whitesmoke',
-    showLabel: true
-  });
+  // 宿主端通过 document.title 判断在线地图是否真正可用，失败时切回本地绘制的地图。
+  const MAP_STATUS_READY = 'map-ready';
+  const MAP_STATUS_UNAVAILABLE = 'map-unavailable';
+
+  const supportsWebGl = () => {
+    try {
+      const probe = document.createElement('canvas');
+      return Boolean(probe.getContext('webgl') || probe.getContext('experimental-webgl'));
+    } catch (error) {
+      return false;
+    }
+  };
+
+  let map = null;
   let stationMarkers = [];
   let routeLine = null;
   let routeMarkers = [];
 
   window.setCenter = (lat, lng) => {
+    if (!map) return;
     map.setZoomAndCenter(14, [Number(lng), Number(lat)], false, 300);
   };
 
   window.setStations = (items) => {
+    if (!map) return;
     map.remove(stationMarkers);
     stationMarkers = (items || []).map((item, index) => {
       const safeName = String(item.name || '充电站').replace(/[&<>'"]/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
@@ -63,6 +72,7 @@
   };
 
   window.setRoute = (payload) => {
+    if (!map) return;
     if (routeLine) map.remove(routeLine);
     map.remove(routeMarkers);
     routeMarkers = [];
@@ -89,6 +99,36 @@
     routeMarkers = [origin, destination];
     map.setFitView([routeLine, ...routeMarkers], false, [90,48,64,48], 16);
   };
+
+  const createMap = () => {
+    if (typeof AMap === 'undefined') {
+      console.error('高德 JS API 未加载，请检查 key 与网络。');
+      return null;
+    }
+    if (!supportsWebGl()) {
+      console.error('当前环境没有可用的 WebGL，高德 JS API 2.0 无法渲染。');
+      return null;
+    }
+    try {
+      return new AMap.Map('map', {
+        zoom: 13,
+        center: [116.171271, 39.735678],
+        viewMode: '2D',
+        mapStyle: 'amap://styles/whitesmoke',
+        showLabel: true
+      });
+    } catch (error) {
+      console.error('高德地图初始化失败：' + error);
+      return null;
+    }
+  };
+
+  map = createMap();
+  document.title = map ? MAP_STATUS_READY : MAP_STATUS_UNAVAILABLE;
+  if (map) {
+    // WebGL 上下文可能在渲染阶段才丢失，丢失后退回宿主端自绘地图。
+    map.on('webglcontextlost', () => { document.title = MAP_STATUS_UNAVAILABLE; });
+  }
 </script>
 </body>
 </html>

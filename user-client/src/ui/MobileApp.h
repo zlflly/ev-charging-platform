@@ -17,7 +17,9 @@ class QFrame;
 class QLabel;
 class QLineEdit;
 class QPushButton;
+class QStackedLayout;
 class QStackedWidget;
+class QTimer;
 class QVBoxLayout;
 class QWebEngineView;
 
@@ -90,6 +92,7 @@ private:
 
 class AmapWidget final : public QWidget
 {
+    Q_OBJECT
 public:
     explicit AmapWidget(QWidget* parent = nullptr);
     void setStations(const QList<StationInfo>& stations);
@@ -98,10 +101,15 @@ public:
     bool usesLiveMap() const { return liveMap_; }
 private:
     void runScript(const QString& script);
+    void handleMapStatus(const QString& status);
+    void fallBackToOfflineMap(const QString& reason);
+
+    QStackedLayout* mapStack_ = nullptr;
     QWebEngineView* webView_ = nullptr;
     EnergyMapWidget* fallback_ = nullptr;
+    QTimer* readinessTimeout_ = nullptr;
     bool liveMap_ = false;
-    bool loaded_ = false;
+    bool ready_ = false;
     QStringList queuedScripts_;
 };
 
@@ -140,6 +148,7 @@ private:
     void applyNavigationRoute(const RouteResult& route);
     void updateNavigationStep(int index);
     void requestActiveOrder(Page destination = ChargingPage);
+    void pollChargingStatus();
     void renderOrder(const OrderInfo& order);
     void reserveCharger(const ChargerInfo& charger);
     void performOrderAction(const QString& action, QPushButton* source);
@@ -244,6 +253,8 @@ private:
     QLabel* chargingNotice_ = nullptr;
     QPushButton* chargingAction_ = nullptr;
     OrderInfo activeOrder_;
+    QTimer* chargingPollTimer_ = nullptr;
+    bool statusPollInFlight_ = false;
 
     QLabel* orderHeadline_ = nullptr;
     QLabel* orderSummary_ = nullptr;

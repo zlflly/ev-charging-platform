@@ -11,6 +11,19 @@
 #include <QTimer>
 
 namespace {
+// WSL / 虚拟机里的 OpenGL 驱动会被 Chromium 判定为不可信并把 WebGL 加入黑名单，
+// 而高德 JS API 2.0 只有 WebGL 一条渲染路径，被禁用后地图会在加载完成后立刻变成空白。
+// 这里在创建 QApplication 之前放开黑名单；用户显式设置过同名变量时不覆盖。
+void relaxWebEngineGpuBlocklist()
+{
+    static const char* const kChromiumFlagsEnvironment = "QTWEBENGINE_CHROMIUM_FLAGS";
+    QByteArray flags = qgetenv(kChromiumFlagsEnvironment).trimmed();
+    if (flags.contains("ignore-gpu-blocklist")) return;
+    if (!flags.isEmpty()) flags.append(' ');
+    flags.append("--ignore-gpu-blocklist");
+    qputenv(kChromiumFlagsEnvironment, flags);
+}
+
 void loadLocalEnvironment()
 {
     const QStringList candidates{
@@ -36,6 +49,7 @@ void loadLocalEnvironment()
 
 int main(int argc, char* argv[])
 {
+    relaxWebEngineGpuBlocklist();
     QApplication application(argc, argv);
     QCoreApplication::setApplicationName(QStringLiteral("ev-user-client"));
     QCoreApplication::setOrganizationName(QStringLiteral("ev-charging-platform"));

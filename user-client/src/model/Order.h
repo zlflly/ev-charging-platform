@@ -30,7 +30,6 @@ struct OrderInfo
     double longitude = 0.0;
     double pricePerKwh = 0.0;
     double powerKw = 0.0;
-    qint64 createTimeMs = 0;
     qint64 startTimeMs = 0;
     qint64 stopTimeMs = 0;
     qint64 settleTimeMs = 0;
@@ -90,8 +89,6 @@ struct OrderInfo
         order.longitude = json.value(QStringLiteral("longitude")).toDouble();
         order.pricePerKwh = json.value(QStringLiteral("pricePerKwh")).toDouble();
         order.powerKw = json.value(QStringLiteral("powerKw")).toDouble();
-        order.createTimeMs = static_cast<qint64>(
-            json.value(QStringLiteral("createTime")).toDouble());
         order.startTimeMs = static_cast<qint64>(
             json.value(QStringLiteral("startTime")).toDouble());
         order.stopTimeMs = static_cast<qint64>(
