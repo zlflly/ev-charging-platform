@@ -49,14 +49,18 @@ inline constexpr const char* kOrderHistory      = "order.history";
 
 // 管理员端（Commit 6 补齐）
 inline constexpr const char* kAdminLogin         = "admin.login";
-inline constexpr const char* kAdminUsersList     = "admin.users.list";
-inline constexpr const char* kAdminUsersFreeze   = "admin.users.freeze";
-inline constexpr const char* kAdminStationsList  = "admin.stations.list";
-inline constexpr const char* kAdminStationsCreate = "admin.stations.create";
+inline constexpr const char* kAdminChargerOverview = "admin.charger.overview";
 inline constexpr const char* kAdminChargersList  = "admin.chargers.list";
 inline constexpr const char* kAdminChargersRestart = "admin.chargers.restart";
+inline constexpr const char* kAdminChargersStatusUpdate = "admin.chargers.status.update";
+inline constexpr const char* kAdminStationsList  = "admin.stations.list";
+inline constexpr const char* kAdminStationsCreate = "admin.stations.create";
+inline constexpr const char* kAdminStationsUpdate = "admin.stations.update";
+inline constexpr const char* kAdminUsersList     = "admin.users.list";
+inline constexpr const char* kAdminUsersFreeze   = "admin.users.freeze";
 inline constexpr const char* kAdminRevenueSummary = "admin.revenue.summary";
 inline constexpr const char* kAdminRevenueTrend  = "admin.revenue.trend";
+inline constexpr const char* kAdminOrdersList    = "admin.orders.list";
 inline constexpr const char* kAdminChargersStats = "admin.chargers.stats";
 
 // 机器学习端（Commit 7 补齐）

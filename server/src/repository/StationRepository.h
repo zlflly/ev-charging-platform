@@ -15,6 +15,7 @@ struct Station {
     double longitude;
     double pricePerKwh;
     int status;  // 0=active, 1=inactive
+    int version; // 并发控制版本号
     qint64 createdAt;
 };
 
@@ -33,8 +34,10 @@ public:
     static QVector<Station> findActive();
 
     // 创建站点
-    static std::optional<Station> create(const QString& name, const QString& address,
-                                         double latitude, double longitude, double pricePerKwh);
+    static int create(const Station& station);
+
+    // 更新站点
+    static bool update(const Station& station);
 
     // 更新站点状态
     static bool setStatus(int stationId, int status);

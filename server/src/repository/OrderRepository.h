@@ -56,6 +56,16 @@ public:
 
     // 结算订单（记录结算时间）
     static bool settle(int orderId, qint64 settleTime);
+
+    // 查询充电桩关联的未完成订单（用于管理端安全检查）
+    static std::optional<Order> findActiveOrderByCharger(int chargerId);
+
+    // 统计充电桩累计数据
+    struct ChargerStats {
+        int totalCount;
+        int totalDurationSeconds;
+    };
+    static ChargerStats getChargerStats(int chargerId);
 };
 
 } // namespace repository

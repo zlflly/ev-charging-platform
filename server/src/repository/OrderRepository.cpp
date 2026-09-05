@@ -252,4 +252,58 @@ bool OrderRepository::settle(int orderId, qint64 settleTime) {
     return query.numRowsAffected() > 0;
 }
 
+std::optional<Order> OrderRepository::findActiveOrderByCharger(int chargerId) {
+    QSqlQuery query(Database::instance().db());
+    query.prepare("SELECT orderId, userId, chargerId, stationId, status, startTime, stopTime, "
+                  "settleTime, duration, energyKwh, amount, createdAt "
+                  "FROM orders WHERE chargerId = ? AND status IN ('RESERVED', 'CHARGING', 'WAIT_SETTLEMENT') "
+                  "ORDER BY createdAt DESC LIMIT 1");
+    query.addBindValue(chargerId);
+
+    if (!query.exec()) {
+        qWarning() << "Failed to query active order by charger:" << query.lastError().text();
+        return std::nullopt;
+    }
+
+    if (!query.next()) {
+        return std::nullopt;
+    }
+
+    Order order;
+    order.orderId = query.value(0).toInt();
+    order.userId = query.value(1).toInt();
+    order.chargerId = query.value(2).toInt();
+    order.stationId = query.value(3).toInt();
+    order.status = query.value(4).toString();
+    order.startTime = query.value(5).toLongLong();
+    order.stopTime = query.value(6).toLongLong();
+    order.settleTime = query.value(7).toLongLong();
+    order.duration = query.value(8).toInt();
+    order.energyKwh = query.value(9).toDouble();
+    order.amount = query.value(10).toDouble();
+    order.createdAt = query.value(11).toLongLong();
+
+    return order;
+}
+
+OrderRepository::ChargerStats OrderRepository::getChargerStats(int chargerId) {
+    ChargerStats stats = {0, 0};
+    QSqlQuery query(Database::instance().db());
+    query.prepare("SELECT COUNT(*), COALESCE(SUM(duration), 0) "
+                  "FROM orders WHERE chargerId = ? AND status = 'FINISHED'");
+    query.addBindValue(chargerId);
+
+    if (!query.exec()) {
+        qWarning() << "Failed to get charger stats:" << query.lastError().text();
+        return stats;
+    }
+
+    if (query.next()) {
+        stats.totalCount = query.value(0).toInt();
+        stats.totalDurationSeconds = query.value(1).toInt();
+    }
+
+    return stats;
+}
+
 } // namespace repository

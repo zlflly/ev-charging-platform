@@ -17,6 +17,7 @@
 #include "service/UserService.h"
 #include "service/StationService.h"
 #include "service/OrderService.h"
+#include "service/AdminService.h"
 
 namespace net {
 
@@ -31,6 +32,7 @@ public:
         , m_userService(new service::UserService(this))
         , m_stationService(new service::StationService(this))
         , m_orderService(new service::OrderService(this))
+        , m_adminService(new service::AdminService(this))
     {
         // 公共接口
         registerHandler(protocol::action::kPing, &RequestDispatcher::handlePing);
@@ -53,8 +55,20 @@ public:
         registerHandler(protocol::action::kOrderSettle, &RequestDispatcher::handleOrderSettle);
         registerHandler(protocol::action::kOrderHistory, &RequestDispatcher::handleOrderHistory);
 
-        // 后续 Commit 补充：
-        // Commit 6: admin.*
+        // 管理员端接口（Commit 6）
+        registerHandler(protocol::action::kAdminLogin, &RequestDispatcher::handleAdminLogin);
+        registerHandler(protocol::action::kAdminChargerOverview, &RequestDispatcher::handleAdminChargerOverview);
+        registerHandler(protocol::action::kAdminChargersList, &RequestDispatcher::handleAdminChargersList);
+        registerHandler(protocol::action::kAdminChargersRestart, &RequestDispatcher::handleAdminChargersRestart);
+        registerHandler(protocol::action::kAdminChargersStatusUpdate, &RequestDispatcher::handleAdminChargersStatusUpdate);
+        registerHandler(protocol::action::kAdminStationsList, &RequestDispatcher::handleAdminStationsList);
+        registerHandler(protocol::action::kAdminStationsCreate, &RequestDispatcher::handleAdminStationsCreate);
+        registerHandler(protocol::action::kAdminStationsUpdate, &RequestDispatcher::handleAdminStationsUpdate);
+        registerHandler(protocol::action::kAdminUsersList, &RequestDispatcher::handleAdminUsersList);
+        registerHandler(protocol::action::kAdminUsersFreeze, &RequestDispatcher::handleAdminUsersFreeze);
+        registerHandler(protocol::action::kAdminRevenueSummary, &RequestDispatcher::handleAdminRevenueSummary);
+        registerHandler(protocol::action::kAdminRevenueTrend, &RequestDispatcher::handleAdminRevenueTrend);
+        registerHandler(protocol::action::kAdminOrdersList, &RequestDispatcher::handleAdminOrdersList);
     }
 
     void dispatch(const protocol::Request& request, TcpConnection* connection)
@@ -213,11 +227,92 @@ private:
         connection->sendResponse(protocol::buildResponse(request.requestId, response));
     }
 
+    // Commit 6: 管理员接口
+
+    void handleAdminLogin(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_adminService->handleLogin(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleAdminChargerOverview(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_adminService->handleChargerOverview(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleAdminChargersList(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_adminService->handleChargersList(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleAdminChargersRestart(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_adminService->handleChargersRestart(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleAdminChargersStatusUpdate(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_adminService->handleChargersStatusUpdate(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleAdminStationsList(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_adminService->handleStationsList(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleAdminStationsCreate(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_adminService->handleStationsCreate(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleAdminStationsUpdate(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_adminService->handleStationsUpdate(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleAdminUsersList(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_adminService->handleUsersList(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleAdminUsersFreeze(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_adminService->handleUsersFreeze(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleAdminRevenueSummary(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_adminService->handleRevenueSummary(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleAdminRevenueTrend(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_adminService->handleRevenueTrend(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
+    void handleAdminOrdersList(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_adminService->handleOrdersList(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
 private:
     QHash<QString, Handler> m_handlers;
     service::UserService* m_userService;
     service::StationService* m_stationService;
     service::OrderService* m_orderService;
+    service::AdminService* m_adminService;
 };
 
 } // namespace net

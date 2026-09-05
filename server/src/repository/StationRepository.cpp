@@ -8,7 +8,7 @@ namespace repository {
 
 std::optional<Station> StationRepository::findById(int stationId) {
     QSqlQuery query(Database::instance().db());
-    query.prepare("SELECT stationId, name, address, latitude, longitude, pricePerKwh, status, createdAt "
+    query.prepare("SELECT stationId, name, address, latitude, longitude, pricePerKwh, status, version, createdAt "
                   "FROM stations WHERE stationId = ?");
     query.addBindValue(stationId);
 
@@ -29,7 +29,8 @@ std::optional<Station> StationRepository::findById(int stationId) {
     station.longitude = query.value(4).toDouble();
     station.pricePerKwh = query.value(5).toDouble();
     station.status = query.value(6).toInt();
-    station.createdAt = query.value(7).toLongLong();
+    station.version = query.value(7).toInt();
+    station.createdAt = query.value(8).toLongLong();
 
     return station;
 }
@@ -38,7 +39,7 @@ QVector<Station> StationRepository::findAll() {
     QVector<Station> stations;
     QSqlQuery query(Database::instance().db());
 
-    if (!query.exec("SELECT stationId, name, address, latitude, longitude, pricePerKwh, status, createdAt "
+    if (!query.exec("SELECT stationId, name, address, latitude, longitude, pricePerKwh, status, version, createdAt "
                     "FROM stations ORDER BY stationId")) {
         qWarning() << "Failed to query all stations:" << query.lastError().text();
         return stations;
@@ -53,7 +54,8 @@ QVector<Station> StationRepository::findAll() {
         station.longitude = query.value(4).toDouble();
         station.pricePerKwh = query.value(5).toDouble();
         station.status = query.value(6).toInt();
-        station.createdAt = query.value(7).toLongLong();
+        station.version = query.value(7).toInt();
+        station.createdAt = query.value(8).toLongLong();
         stations.append(station);
     }
 
@@ -64,7 +66,7 @@ QVector<Station> StationRepository::findActive() {
     QVector<Station> stations;
     QSqlQuery query(Database::instance().db());
 
-    if (!query.exec("SELECT stationId, name, address, latitude, longitude, pricePerKwh, status, createdAt "
+    if (!query.exec("SELECT stationId, name, address, latitude, longitude, pricePerKwh, status, version, createdAt "
                     "FROM stations WHERE status = 0 ORDER BY stationId")) {
         qWarning() << "Failed to query active stations:" << query.lastError().text();
         return stations;
@@ -79,35 +81,55 @@ QVector<Station> StationRepository::findActive() {
         station.longitude = query.value(4).toDouble();
         station.pricePerKwh = query.value(5).toDouble();
         station.status = query.value(6).toInt();
-        station.createdAt = query.value(7).toLongLong();
+        station.version = query.value(7).toInt();
+        station.createdAt = query.value(8).toLongLong();
         stations.append(station);
     }
 
     return stations;
 }
 
-std::optional<Station> StationRepository::create(const QString& name, const QString& address,
-                                                  double latitude, double longitude, double pricePerKwh) {
+int StationRepository::create(const Station& station) {
     qint64 now = QDateTime::currentMSecsSinceEpoch();
 
     QSqlQuery query(Database::instance().db());
-    query.prepare("INSERT INTO stations (name, address, latitude, longitude, pricePerKwh, status, createdAt) "
-                  "VALUES (?, ?, ?, ?, ?, ?, ?)");
-    query.addBindValue(name);
-    query.addBindValue(address);
-    query.addBindValue(latitude);
-    query.addBindValue(longitude);
-    query.addBindValue(pricePerKwh);
+    query.prepare("INSERT INTO stations (name, address, latitude, longitude, pricePerKwh, status, version, createdAt) "
+                  "VALUES (?, ?, ?, ?, ?, ?, 1, ?)");
+    query.addBindValue(station.name);
+    query.addBindValue(station.address);
+    query.addBindValue(station.latitude);
+    query.addBindValue(station.longitude);
+    query.addBindValue(station.pricePerKwh);
     query.addBindValue(0);  // active
     query.addBindValue(now);
 
     if (!query.exec()) {
         qWarning() << "Failed to create station:" << query.lastError().text();
-        return std::nullopt;
+        return 0;
     }
 
-    int stationId = query.lastInsertId().toInt();
-    return findById(stationId);
+    return query.lastInsertId().toInt();
+}
+
+bool StationRepository::update(const Station& station) {
+    QSqlQuery query(Database::instance().db());
+    query.prepare("UPDATE stations SET name = ?, address = ?, latitude = ?, longitude = ?, "
+                  "pricePerKwh = ?, version = version + 1 "
+                  "WHERE stationId = ? AND version = ?");
+    query.addBindValue(station.name);
+    query.addBindValue(station.address);
+    query.addBindValue(station.latitude);
+    query.addBindValue(station.longitude);
+    query.addBindValue(station.pricePerKwh);
+    query.addBindValue(station.stationId);
+    query.addBindValue(station.version);
+
+    if (!query.exec()) {
+        qWarning() << "Failed to update station:" << query.lastError().text();
+        return false;
+    }
+
+    return query.numRowsAffected() > 0;
 }
 
 bool StationRepository::setStatus(int stationId, int status) {

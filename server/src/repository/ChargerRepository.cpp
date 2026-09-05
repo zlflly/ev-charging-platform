@@ -36,7 +36,7 @@ std::optional<Charger> ChargerRepository::findById(int chargerId) {
     return charger;
 }
 
-QVector<Charger> ChargerRepository::findByStation(int stationId) {
+QVector<Charger> ChargerRepository::findByStationId(int stationId) {
     QVector<Charger> chargers;
     QSqlQuery query(Database::instance().db());
     query.prepare("SELECT chargerId, stationId, code, type, status, powerKw, "
@@ -46,6 +46,34 @@ QVector<Charger> ChargerRepository::findByStation(int stationId) {
 
     if (!query.exec()) {
         qWarning() << "Failed to query chargers by station:" << query.lastError().text();
+        return chargers;
+    }
+
+    while (query.next()) {
+        Charger charger;
+        charger.chargerId = query.value(0).toInt();
+        charger.stationId = query.value(1).toInt();
+        charger.code = query.value(2).toString();
+        charger.type = query.value(3).toInt();
+        charger.status = query.value(4).toInt();
+        charger.powerKw = query.value(5).toDouble();
+        charger.totalChargeCount = query.value(6).toInt();
+        charger.totalChargeDurationSeconds = query.value(7).toInt();
+        charger.createdAt = query.value(8).toLongLong();
+        chargers.append(charger);
+    }
+
+    return chargers;
+}
+
+QVector<Charger> ChargerRepository::findAll() {
+    QVector<Charger> chargers;
+    QSqlQuery query(Database::instance().db());
+
+    if (!query.exec("SELECT chargerId, stationId, code, type, status, powerKw, "
+                    "totalChargeCount, totalChargeDurationSeconds, createdAt "
+                    "FROM chargers ORDER BY stationId, code")) {
+        qWarning() << "Failed to query all chargers:" << query.lastError().text();
         return chargers;
     }
 
@@ -102,18 +130,37 @@ QVector<ChargerWithStation> ChargerRepository::findAllWithStation() {
     return result;
 }
 
-bool ChargerRepository::setStatus(int chargerId, int status) {
+bool ChargerRepository::updateStatus(int chargerId, int status) {
     QSqlQuery query(Database::instance().db());
     query.prepare("UPDATE chargers SET status = ? WHERE chargerId = ?");
     query.addBindValue(status);
     query.addBindValue(chargerId);
 
     if (!query.exec()) {
-        qWarning() << "Failed to set charger status:" << query.lastError().text();
+        qWarning() << "Failed to update charger status:" << query.lastError().text();
         return false;
     }
 
     return query.numRowsAffected() > 0;
+}
+
+int ChargerRepository::create(const Charger& charger) {
+    QSqlQuery query(Database::instance().db());
+    query.prepare("INSERT INTO chargers (stationId, code, type, status, powerKw, createdAt) "
+                  "VALUES (?, ?, ?, ?, ?, ?)");
+    query.addBindValue(charger.stationId);
+    query.addBindValue(charger.code);
+    query.addBindValue(charger.type);
+    query.addBindValue(charger.status);
+    query.addBindValue(charger.powerKw);
+    query.addBindValue(QDateTime::currentMSecsSinceEpoch());
+
+    if (!query.exec()) {
+        qWarning() << "Failed to create charger:" << query.lastError().text();
+        return 0;
+    }
+
+    return query.lastInsertId().toInt();
 }
 
 bool ChargerRepository::incrementStats(int chargerId, int durationSeconds) {

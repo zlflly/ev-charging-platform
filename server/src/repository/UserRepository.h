@@ -46,8 +46,8 @@ public:
     // 设置余额（绝对值）
     static bool setBalance(int userId, double newBalance);
 
-    // 冻结/解冻用户
-    static bool setStatus(int userId, int status);
+    // 更新用户状态（冻结/解冻）
+    static bool updateStatus(int userId, int status);
 
     // 查询所有用户（管理员用）
     static QVector<User> findAll();

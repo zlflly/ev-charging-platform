@@ -33,13 +33,19 @@ public:
     static std::optional<Charger> findById(int chargerId);
 
     // 查询站点下的所有充电桩
-    static QVector<Charger> findByStation(int stationId);
+    static QVector<Charger> findByStationId(int stationId);
+
+    // 查询所有充电桩
+    static QVector<Charger> findAll();
 
     // 查询所有充电桩（含站点名）
     static QVector<ChargerWithStation> findAllWithStation();
 
     // 更新充电桩状态
-    static bool setStatus(int chargerId, int status);
+    static bool updateStatus(int chargerId, int status);
+
+    // 创建充电桩
+    static int create(const Charger& charger);
 
     // 增加累计次数和时长（原子操作）
     static bool incrementStats(int chargerId, int durationSeconds);

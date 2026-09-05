@@ -176,7 +176,7 @@ bool UserRepository::setBalance(int userId, double newBalance) {
     return query.numRowsAffected() > 0;
 }
 
-bool UserRepository::setStatus(int userId, int status) {
+bool UserRepository::updateStatus(int userId, int status) {
     qint64 now = QDateTime::currentMSecsSinceEpoch();
 
     QSqlQuery query(Database::instance().db());
@@ -186,7 +186,7 @@ bool UserRepository::setStatus(int userId, int status) {
     query.addBindValue(userId);
 
     if (!query.exec()) {
-        qWarning() << "Failed to set user status:" << query.lastError().text();
+        qWarning() << "Failed to update user status:" << query.lastError().text();
         return false;
     }
 
