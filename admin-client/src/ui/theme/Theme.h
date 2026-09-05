@@ -57,7 +57,7 @@ inline QString globalStyleSheet()
             color:#1769E8; background:#EAF2FF; border-left-color:#1769E8; font-weight:700;
         }
         QPushButton#primaryButton, QPushButton#secondaryButton,
-        QPushButton#dangerButton, QPushButton#ghostButton {
+        QPushButton#dangerButton, QPushButton#ghostButton, QPushButton#segmentButton {
             min-height:38px; border-radius:10px; padding:0 16px; font-weight:650;
         }
         QPushButton#primaryButton { color:#FFFFFF; background:#246BFD; border:1px solid #246BFD; }
@@ -68,6 +68,13 @@ inline QString globalStyleSheet()
         QPushButton#dangerButton:hover { color:#FFFFFF; background:#D94852; border-color:#D94852; }
         QPushButton#ghostButton { color:#64778B; background:transparent; border:1px solid #D1DDE8; }
         QPushButton#ghostButton:hover { color:#1769E8; border-color:#8DB7EA; background:#F3F8FF; }
+        QPushButton#segmentButton {
+            color:#64778B; background:#F5F8FB; border:1px solid #D1DDE8;
+        }
+        QPushButton#segmentButton:hover { color:#1769E8; border-color:#8DB7EA; }
+        QPushButton#segmentButton:checked {
+            color:#FFFFFF; background:#246BFD; border-color:#246BFD;
+        }
         QPushButton#faultAlertButton {
             min-height:38px; padding:0 14px; color:#C43742; background:#FFF0F1;
             border:1px solid #F1BEC3; border-radius:10px; font-weight:700;
@@ -90,6 +97,14 @@ inline QString globalStyleSheet()
             color:#183153; background:#FFFFFF; alternate-background-color:#F8FAFC;
             border:0; gridline-color:#E2E9F0;
             selection-background-color:#DCEBFF; selection-color:#10233F;
+        }
+        QListWidget#attentionList {
+            color:#183153; background:#F8FAFC; border:1px solid #E2E9F0;
+            border-radius:9px; padding:3px; outline:0;
+        }
+        QListWidget#attentionList::item {
+            background:#FFFFFF; border:0; border-bottom:1px solid #E8EEF4;
+            border-radius:6px; padding:5px 8px;
         }
         QHeaderView::section {
             color:#5E748B; background:#F3F7FB; border:0;
@@ -123,6 +138,10 @@ inline QString globalStyleSheet()
         QLabel#formError {
             color:#B72E39; background:#FFF0F1; border:1px solid #F1BEC3;
             border-radius:10px; padding:9px 12px;
+        }
+        QLabel#revenueNote {
+            color:#536A82; background:#F3F7FB; border:1px solid #DCE5EE;
+            border-radius:9px; padding:8px 11px; font-size:12px;
         }
         QLabel#dialogStatus {
             min-width:52px; min-height:52px; max-width:52px; max-height:52px;

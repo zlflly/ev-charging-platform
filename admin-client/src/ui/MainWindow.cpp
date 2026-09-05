@@ -8,18 +8,16 @@
 #include "ui/ChargerManagementPage.h"
 #include "ui/StationManagementPage.h"
 #include "ui/UserManagementPage.h"
+#include "ui/RevenueStatisticsPage.h"
+#include "ui/OperationsOverviewPage.h"
 #include "ui/theme/Theme.h"
-#include "ui/widgets/ChargerStatusOverviewWidget.h"
-#include "ui/widgets/EntityTableView.h"
 
 #include <QApplication>
 #include <QDateTime>
 #include <QFrame>
-#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
-#include <QScrollArea>
 #include <QStackedWidget>
 #include <QStyle>
 #include <QTimer>
@@ -84,14 +82,16 @@ MainWindow::MainWindow(NetworkClient* network,
     workspaceLayout->addWidget(createTopbar());
 
     pages_ = new QStackedWidget(workspace);
-    pages_->addWidget(createOverviewPage());
+    operationsOverviewPage_ = new OperationsOverviewPage(api_, pages_);
+    pages_->addWidget(operationsOverviewPage_);
     chargerManagementPage_ = new ChargerManagementPage(api_, pages_);
     pages_->addWidget(chargerManagementPage_);
     stationManagementPage_ = new StationManagementPage(api_, pages_);
     pages_->addWidget(stationManagementPage_);
     userManagementPage_ = new UserManagementPage(api_, pages_);
     pages_->addWidget(userManagementPage_);
-    pages_->addWidget(createRevenuePage());
+    revenueStatisticsPage_ = new RevenueStatisticsPage(api_, pages_);
+    pages_->addWidget(revenueStatisticsPage_);
     workspaceLayout->addWidget(pages_, 1);
     rootLayout->addWidget(workspace, 1);
 
@@ -110,8 +110,8 @@ MainWindow::MainWindow(NetworkClient* network,
             this, &MainWindow::refreshAdminInfo);
     connect(session_, &AdminSession::authenticationChanged, this,
             [this](bool authenticated) {
-        if (authenticated && chargerOverviewWidget_) {
-            chargerOverviewWidget_->refresh();
+        if (authenticated && operationsOverviewPage_) {
+            operationsOverviewPage_->refresh();
         }
     });
 
@@ -225,145 +225,6 @@ QWidget* MainWindow::createTopbar()
     return topbar;
 }
 
-QWidget* MainWindow::createOverviewPage()
-{
-    auto* page = new QWidget(this);
-    page->setObjectName(QStringLiteral("pageRoot"));
-    auto* layout = new QGridLayout(page);
-    layout->setContentsMargins(theme::kPageMargin, 20,
-                               theme::kPageMargin, theme::kPageMargin);
-    layout->setHorizontalSpacing(14);
-    layout->setVerticalSpacing(14);
-
-    layout->addWidget(createMetricCard(QStringLiteral("今日营收"), QStringLiteral("¥ --"),
-                                       QStringLiteral("等待统计接口"), QStringLiteral("#14865A")), 0, 0);
-    layout->addWidget(createMetricCard(QStringLiteral("本月营收"), QStringLiteral("¥ --"),
-                                       QStringLiteral("等待统计接口"), QStringLiteral("#1769E8")), 0, 1);
-    layout->addWidget(createMetricCard(QStringLiteral("累计营收"), QStringLiteral("¥ --"),
-                                       QStringLiteral("等待统计接口"), QStringLiteral("#9C8CFF")), 0, 2);
-    layout->addWidget(createMetricCard(QStringLiteral("运营站点"), QStringLiteral("--"),
-                                       QStringLiteral("等待站点接口"), QStringLiteral("#A66C00")), 0, 3);
-    layout->addWidget(createMetricCard(QStringLiteral("充电桩总数"), QStringLiteral("--"),
-                                       QStringLiteral("服务端实时聚合"), QStringLiteral("#2AD4D9"),
-                                       &chargerTotalLabel_), 0, 4);
-    layout->addWidget(createMetricCard(QStringLiteral("平台用户"), QStringLiteral("--"),
-                                       QStringLiteral("等待用户接口"), QStringLiteral("#FF8DA1")), 0, 5);
-
-    chargerOverviewWidget_ = new ChargerStatusOverviewWidget(api_, page);
-    connect(chargerOverviewWidget_, &ChargerStatusOverviewWidget::overviewUpdated,
-            this, [this](qint64 total) {
-        if (chargerTotalLabel_) {
-            chargerTotalLabel_->setText(QString::number(total));
-        }
-    });
-    layout->addWidget(createSectionCard(QStringLiteral("充电桩状态总览"),
-                                        chargerOverviewWidget_),
-                      1, 0, 1, 6);
-
-    auto* trend = createPlaceholderPanel(
-        QStringLiteral("营收趋势 · 最近 7 日"),
-        QStringLiteral("QChart 数据视图将在营收统计节点接入\n当前不展示任何模拟收入"),
-        QStringLiteral("#1769E8"));
-    layout->addWidget(createSectionCard(QStringLiteral("销售业绩"), trend), 2, 0, 1, 4);
-
-    auto* faultTable = new EntityTableView(
-        {QStringLiteral("电桩编号"), QStringLiteral("所属站点"), QStringLiteral("状态")}, page);
-    faultTable->setState(EntityTableView::State::Empty,
-                         QStringLiteral("故障设备将在此集中展示"));
-    layout->addWidget(createSectionCard(QStringLiteral("故障设备"), faultTable), 2, 4, 1, 2);
-
-    for (int column = 0; column < 6; ++column) {
-        layout->setColumnStretch(column, 1);
-    }
-    layout->setRowStretch(1, 2);
-    layout->setRowStretch(2, 2);
-    return page;
-}
-
-QWidget* MainWindow::createRevenuePage()
-{
-    auto* page = new QWidget(this);
-    page->setObjectName(QStringLiteral("pageRoot"));
-    auto* layout = new QGridLayout(page);
-    layout->setContentsMargins(theme::kPageMargin, 20,
-                               theme::kPageMargin, theme::kPageMargin);
-    layout->setSpacing(14);
-    layout->addWidget(createMetricCard(QStringLiteral("今日营收"), QStringLiteral("¥ --"),
-                                       QStringLiteral("已结算订单口径待冻结"), QStringLiteral("#14865A")), 0, 0);
-    layout->addWidget(createMetricCard(QStringLiteral("本月营收"), QStringLiteral("¥ --"),
-                                       QStringLiteral("已结算订单口径待冻结"), QStringLiteral("#1769E8")), 0, 1);
-    layout->addWidget(createMetricCard(QStringLiteral("累计营收"), QStringLiteral("¥ --"),
-                                       QStringLiteral("已结算订单口径待冻结"), QStringLiteral("#9C8CFF")), 0, 2);
-    layout->addWidget(createSectionCard(
-                          QStringLiteral("营收趋势 · 7 日 / 30 日"),
-                          createPlaceholderPanel(
-                              QStringLiteral("等待营收序列接口"),
-                              QStringLiteral("缺失日期补零与迟到响应保护将在业务节点完成"),
-                              QStringLiteral("#1769E8"))),
-                      1, 0, 1, 3);
-    layout->setRowStretch(1, 1);
-    return page;
-}
-
-QWidget* MainWindow::createMetricCard(const QString& label,
-                                      const QString& value,
-                                      const QString& hint,
-                                      const QString& accent,
-                                      QLabel** valueLabel)
-{
-    auto* card = new QFrame(this);
-    card->setObjectName(QStringLiteral("metricCard"));
-    card->setMinimumHeight(104);
-    auto* layout = new QVBoxLayout(card);
-    layout->setContentsMargins(16, 14, 16, 14);
-    layout->setSpacing(5);
-    auto* line = new QFrame(card);
-    line->setFixedHeight(2);
-    line->setStyleSheet(QStringLiteral("background:%1; border-radius:1px;").arg(accent));
-    layout->addWidget(line);
-    layout->addWidget(makeLabel(label, QStringLiteral("metricLabel"), card));
-    auto* metricValue = makeLabel(value, QStringLiteral("metricValue"), card);
-    if (valueLabel) {
-        *valueLabel = metricValue;
-    }
-    layout->addWidget(metricValue);
-    layout->addWidget(makeLabel(hint, QStringLiteral("metricHint"), card));
-    return card;
-}
-
-QWidget* MainWindow::createSectionCard(const QString& title, QWidget* content)
-{
-    auto* card = new QFrame(this);
-    card->setObjectName(QStringLiteral("sectionCard"));
-    auto* layout = new QVBoxLayout(card);
-    layout->setContentsMargins(16, 14, 16, 16);
-    layout->setSpacing(10);
-    layout->addWidget(makeLabel(title, QStringLiteral("sectionTitle"), card));
-    layout->addWidget(content, 1);
-    return card;
-}
-
-QWidget* MainWindow::createPlaceholderPanel(const QString& title,
-                                            const QString& message,
-                                            const QString& accent)
-{
-    auto* panel = new QWidget(this);
-    auto* layout = new QVBoxLayout(panel);
-    layout->setAlignment(Qt::AlignCenter);
-    auto* mark = new QLabel(QStringLiteral("━━━"), panel);
-    mark->setAlignment(Qt::AlignCenter);
-    mark->setStyleSheet(QStringLiteral("color:%1; font-size:22px;").arg(accent));
-    auto* titleLabel = makeLabel(title, QStringLiteral("stateTitle"), panel);
-    titleLabel->setAlignment(Qt::AlignCenter);
-    auto* messageLabel = makeLabel(message, QStringLiteral("stateMessage"), panel);
-    messageLabel->setAlignment(Qt::AlignCenter);
-    messageLabel->setWordWrap(true);
-    layout->addWidget(mark);
-    layout->addWidget(titleLabel);
-    layout->addWidget(messageLabel);
-    return panel;
-}
-
 void MainWindow::addNavigationButton(const QString& text, int pageIndex)
 {
     auto* button = new QPushButton(text, this);
@@ -385,8 +246,8 @@ void MainWindow::switchPage(int pageIndex)
     pageTitle_->setText(kPageTitles.at(pageIndex));
     pageSubtitle_->setText(kPageSubtitles.at(pageIndex));
     navigationButtons_.at(pageIndex)->setChecked(true);
-    if (pageIndex == 0 && session_->isAuthenticated() && chargerOverviewWidget_) {
-        chargerOverviewWidget_->refresh();
+    if (pageIndex == 0 && session_->isAuthenticated() && operationsOverviewPage_) {
+        operationsOverviewPage_->refresh();
     }
     if (pageIndex == 1 && session_->isAuthenticated() && chargerManagementPage_) {
         chargerManagementPage_->refresh();
@@ -396,6 +257,9 @@ void MainWindow::switchPage(int pageIndex)
     }
     if (pageIndex == 3 && session_->isAuthenticated() && userManagementPage_) {
         userManagementPage_->refresh();
+    }
+    if (pageIndex == 4 && session_->isAuthenticated() && revenueStatisticsPage_) {
+        revenueStatisticsPage_->refresh();
     }
 }
 

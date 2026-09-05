@@ -594,6 +594,83 @@ bool AdminApiClient::isUserStatusUpdateInFlight() const
     return userStatusUpdateInFlight_;
 }
 
+bool AdminApiClient::requestRevenueSummary(RevenueSummaryCallback callback)
+{
+    if (revenueSummaryInFlight_) {
+        return false;
+    }
+    revenueSummaryInFlight_ = true;
+    sendAuthenticated(
+        QString::fromUtf8(protocol::action::kAdminRevenueSummary), {},
+        [this, callback = std::move(callback)](
+            const protocol::Response& response) {
+            revenueSummaryInFlight_ = false;
+            if (!response.isOk()) {
+                if (callback) {
+                    callback(std::nullopt,
+                             protocol::describeError(response.code, response.message));
+                }
+                return;
+            }
+            RevenueSummary summary;
+            QString parseError;
+            if (!RevenueSummary::fromJson(response.data, &summary, &parseError)) {
+                if (callback) {
+                    callback(std::nullopt,
+                             QStringLiteral("营收汇总数据异常：%1").arg(parseError));
+                }
+                return;
+            }
+            if (callback) callback(summary, {});
+        });
+    return true;
+}
+
+bool AdminApiClient::isRevenueSummaryInFlight() const
+{
+    return revenueSummaryInFlight_;
+}
+
+bool AdminApiClient::requestRevenueTrend(int days, RevenueTrendCallback callback)
+{
+    if (days != 7 && days != 30) {
+        if (callback) callback(std::nullopt, QStringLiteral("趋势天数只能是 7 或 30"));
+        return false;
+    }
+    ++revenueTrendInFlightCount_;
+    QJsonObject data;
+    data.insert(QStringLiteral("days"), days);
+    sendAuthenticated(
+        QString::fromUtf8(protocol::action::kAdminRevenueTrend), data,
+        [this, days, callback = std::move(callback)](
+            const protocol::Response& response) {
+            revenueTrendInFlightCount_ = qMax(0, revenueTrendInFlightCount_ - 1);
+            if (!response.isOk()) {
+                if (callback) {
+                    callback(std::nullopt,
+                             protocol::describeError(response.code, response.message));
+                }
+                return;
+            }
+            RevenueTrend trend;
+            QString parseError;
+            if (!RevenueTrend::fromJson(response.data, days, &trend, &parseError)) {
+                if (callback) {
+                    callback(std::nullopt,
+                             QStringLiteral("营收趋势数据异常：%1").arg(parseError));
+                }
+                return;
+            }
+            if (callback) callback(trend, {});
+        });
+    return true;
+}
+
+bool AdminApiClient::isRevenueTrendInFlight() const
+{
+    return revenueTrendInFlightCount_ > 0;
+}
+
 QString AdminApiClient::sendAuthenticated(const QString& action,
                                           const QJsonObject& data,
                                           NetworkClient::ResponseCallback callback,

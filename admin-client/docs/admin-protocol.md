@@ -1,7 +1,7 @@
 # 管理员客户端协议约定
 
 > 对齐基线：成员 A `fengshu-server-db` 分支的《协议冻结说明》《对接说明》及
-> `StationService` 实际响应。公共接口以成员 A 为准；管理员未实现部分在本文标为
+> `StationService`、`OrderRepository` 实际字段。公共接口以成员 A 为准；管理员未实现部分在本文标为
 > “待服务端冻结扩展”，不得反向修改已冻结的用户端字段。
 
 ## 传输与消息外壳
@@ -641,6 +641,152 @@
   不得按固定用户 ID 或只按 `CHARGING` 特判。冻结弹窗会先解释订单阶段和当前设备，
   服务端拒绝后再展示真实 `message`。若 A 最终选择允许冻结，必须同时冻结活跃订单
   如何停止/结算及旧连接如何处理，客户端再按权威规则调整。
+
+## 营收汇总
+
+> 对齐状态：成员 A 的《协议冻结说明》已固定 `admin.revenue.summary` action，
+> 含义为“今日/本月/总计营收”；截至本提交，其服务端字段与 handler 尚未冻结。
+> 以下字段是 Commit 6 客户端、Mock 和测试采用的最小联调契约。成员 A 后续若调整，
+> 必须先更新权威协议，管理员客户端再同步，不能由两端分别猜测。
+
+请求 action：`admin.revenue.summary`
+
+```json
+{
+  "action": "admin.revenue.summary",
+  "requestId": "admin-12",
+  "data": {}
+}
+```
+
+成功响应：
+
+```json
+{
+  "requestId": "admin-12",
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "todayRevenue": 128.50,
+    "monthRevenue": 3680.75,
+    "totalRevenue": 15280.25,
+    "currency": "CNY",
+    "timezone": "Asia/Shanghai",
+    "generatedAt": "2026-09-05T12:00:00.000Z"
+  }
+}
+```
+
+- 营收只统计 `status=FINISHED` 的订单，金额取订单最终 `amount`，归属日期取
+  `settleTime`；`RESERVED / CHARGING / WAIT_SETTLEMENT` 均不计收入。
+- `WAIT_SETTLEMENT` 在界面显示“待支付”，表示费用已生成但扣款与订单完结尚未成功，
+  因此不能提前计入今日或累计营收。
+- “今日”和“本月”按 `Asia/Shanghai` 自然日/自然月计算；`totalRevenue` 为全部历史
+  `FINISHED` 订单。成员 A 现有范围查询采用 `[startTime, endTime)`，实现汇总时应
+  沿用左闭右开区间，避免午夜订单重复计数。
+- 金额单位为人民币元，返回 JSON number；服务端负责金额精度和聚合，客户端统一
+  显示两位小数，不下载订单列表重新计算。
+- 三个金额必须非负，且在当前无退款状态机下满足
+  `todayRevenue <= monthRevenue <= totalRevenue`。如果以后引入退款/冲正，应由成员 A
+  先扩展协议，而不是让客户端放宽出负数。
+- `currency` 固定 `CNY`，`timezone` 固定 `Asia/Shanghai`。时间按 A 权威文档优先
+  使用 ISO 8601；过渡期客户端也接受其 Repository 当前使用的 epoch 毫秒。
+- `generatedAt` 是本次统计快照时间。请求失败或响应字段不一致时，客户端清空 KPI，
+  不把旧金额伪装成最新结果。
+- 要求管理员已登录，未登录返回 `1003`；参数错误返回 `1001`，聚合失败返回 `5000`。
+
+## 7 日 / 30 日营收趋势
+
+> 对齐状态：成员 A 已固定 `admin.revenue.trend` action，并描述为按天/周/月趋势；
+> 管理员任务书的 Commit 6 明确要求 7 日和 30 日均为“每日日期桶”。当前采用
+> `days=7|30` 的最小请求，等待成员 A 将字段和日桶边界写入权威协议。
+
+请求：
+
+```json
+{
+  "action": "admin.revenue.trend",
+  "requestId": "admin-13",
+  "data": {
+    "days": 7
+  }
+}
+```
+
+成功响应：
+
+```json
+{
+  "requestId": "admin-13",
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "days": 7,
+    "timezone": "Asia/Shanghai",
+    "generatedAt": "2026-09-05T12:00:00.000Z",
+    "points": [
+      { "date": "2026-08-30", "revenue": 0.00 },
+      { "date": "2026-08-31", "revenue": 86.50 }
+    ]
+  }
+}
+```
+
+- `days` 只允许 `7` 或 `30`，范围包含统计时区中的今天。
+- `points` 必须分别恰好包含 7 或 30 项，使用 `yyyy-MM-dd` 日期，按日期升序、唯一、
+  每项连续一天。没有已结算订单的日期也必须由服务端返回 `revenue: 0.00`。
+- 每个日桶仅汇总该自然日 `settleTime` 落入区间的 `FINISHED` 订单；客户端只校验与
+  绘图，不自行补齐缺失日或从分页历史订单拼统计。
+- 切换 7/30 日时允许两个请求同时在途。页面使用递增 generation，只接受当前选择
+  对应的最新回调，迟到的旧周期响应不会覆盖新图表。
+- 全零、单日收入和大额金额必须正常绘制；响应失败会清空曲线并显示错误状态，避免
+  把旧曲线误认作本次结果。
+
+### 与充电桩统计 action 的边界
+
+成员 A 还预留了 `admin.chargers.stats`（使用率、故障率），但当前客户端已经通过
+`admin.charger.overview` 展示四类实时数量与占比。A 尚未确认前者是替代接口、扩展
+接口还是时段利用率接口，因此 Commit 6 不擅自切换，也不破坏 Commit 2 已验收功能。
+特别是“当前充电中数量/总数”和“统计时段充电时长/可服务时长”不是同一种使用率，
+必须由成员 A 在权威文档中冻结分子、分母、时间范围和离线处理后再接入。
+
+## 运营总览的数据来源与边界
+
+运营总览不是新的服务端聚合 action。为避免首页、管理页和数据库出现三套口径，
+Commit 6 首页只复用已经存在的查询结果：
+
+| 首页展示 | 请求及字段 | 口径/限制 |
+|---|---|---|
+| 今日、本月、累计营收 | `admin.revenue.summary` | 与营收页相同，只含 `FINISHED` |
+| 最近 7 日折线 | `admin.revenue.trend`, `days=7` | 服务端返回 7 个连续自然日日桶 |
+| 运营站点 | `admin.stations.list` 的数组长度 | 当前协议为完整站点列表 |
+| 充电桩总数及四状态 | `admin.charger.overview` | 使用服务端 `total/idle/charging/fault/offline` |
+| 平台用户 | `admin.users.list` 的 `total` | `page=1,pageSize=1,activityFilter=ALL`，不是当前页行数 |
+| 活跃业务人数及摘要 | `admin.users.list` 的 `total/users` | `pageSize=3,activityFilter=ACTIVE`，由服务端按未完成订单筛选 |
+| 故障设备明细 | `admin.chargers.list` 中 `status=2` | 当前为完整列表；首页只读筛选，不改变设备 |
+
+- 首页用户总数与活跃人数必须取服务端分页元数据 `total`，客户端不能只数第一页。
+- 两次 `admin.users.list` 顺序执行，以满足现有 API 同类请求单飞保护。任一失败只把
+  对应指标显示为 `--`，不会用旧查询或其他页面的行数代替。
+- 首页故障明细依赖当前 `admin.chargers.list` 返回完整集合。如果 A 将其分页化，
+  必须先冻结按状态查询或独立故障摘要；否则客户端不得宣称当前页故障数是全平台值。
+- 活跃业务和故障设备在首页以双行摘要显示只是布局策略，不改变响应字段、排序或统计
+  口径；完整站点/设备文本可通过纵向滚动和工具提示查看。
+- A 权威文档预留的 `admin.chargers.stats` 尚未定义字段以及“使用率”的时间范围、
+  分子和分母，所以本提交继续保留已验收的 `admin.charger.overview`。A 冻结替代关系后，
+  客户端、Mock 和本表需在同一次变更中同步。
+- 参考大屏中的“今日订单数”未明确统计哪些订单状态，“站点营收排行”也未明确按
+  `settleTime` 还是充电开始时间归属站点。两项均不得从分页订单或 Mock 样例自行推导；
+  等成员 A 冻结字段后再扩展 `admin.revenue.summary` 或新增权威统计 action。
+- 首页与营收页可能在不同时间各自请求营收数据；两者复用相同 action、DTO、币种和
+  时区校验，不共享过期 UI 缓存。需要跨页同一快照时，以响应中的 `generatedAt` 为准。
+
+### 跨端核对
+
+1. 用户端完成一次 `order.settle`，确保订单真正进入 `FINISHED`。
+2. 刷新营收页面，今日营收和对应日期桶应增加同一笔最终 `amount`。
+3. 仅执行停止、让订单停在 `WAIT_SETTLEMENT` 时，营收不得增加。
+4. 如大屏也展示营收，成员 4 必须复用相同接口与口径，不能另行统计。
 
 ## 会话规则
 

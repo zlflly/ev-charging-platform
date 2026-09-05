@@ -1,6 +1,6 @@
 # EV Charging Platform - Admin Client
 
-Linux + Qt 6 管理员桌面客户端。当前已完成 Commit 5：
+Linux + Qt 6 管理员桌面客户端。当前已完成 Commit 6：
 
 - 宽屏后台主框架与统一导航；
 - 单例式共享 `NetworkClient`，采用 4 字节大端长度前缀 + UTF-8 JSON；
@@ -49,6 +49,23 @@ Linux + Qt 6 管理员桌面客户端。当前已完成 Commit 5：
   与待支付，避免按样例用户 ID 写死业务规则；
 - 全局视觉改为浅灰背景、白色圆角卡片、深蓝正文和蓝色主按钮，和用户端保持同一
   产品语言，同时保留管理端侧栏、表格和信息密度。
+- 运营总览已改为独立聚合页面：复用营收、站点、设备和用户接口，展示今日/本月/
+  累计营收、站点数、桩总数、平台用户数、活跃业务人数及前三条业务/设备摘要；
+- 首页直接复用 `admin.revenue.trend` 绘制最近 7 个自然日折线，不再显示占位说明；
+- “运营关注”从完整 `admin.chargers.list` 响应筛出故障设备，展示设备编号与所属站点；
+  该列表只读，不在首页确认或修改故障状态；
+- 右侧运营关注使用适配窄卡片的双行摘要列表，完整信息可通过换行、纵向滚动和悬停
+  提示查看，不再使用会在小宽度下挤压遮挡的三列表头；
+- 营收汇总复用成员 A 已固定的 `admin.revenue.summary`，展示今日、本月和累计
+  已结算营收；
+- 7/30 日趋势复用 `admin.revenue.trend`，严格校验日桶数量、连续日期、金额、币种
+  与时区，缺失日期由服务端显式返回零值；
+- 浅色自适应折线图支持全零、单日收入、大额缩放和悬停精确金额，不额外要求
+  `Qt6::Charts` 系统组件；
+- 周期切换允许并发请求，并以 generation 丢弃迟到旧响应；加载失败会清空旧曲线，
+  不把缓存数据伪装成最新统计；
+- `WAIT_SETTLEMENT`（待支付）不计营收，只有 `FINISHED` 订单按 `settleTime` 计入；
+  字段尚未被成员 A 冻结的部分已在正式协议中明确标注为联调契约。
 
 管理员协议见 `docs/admin-protocol.md`。默认 `admin/123456` 仅由数据库或 mock
 server 提供，客户端不在本地判断账号密码。
@@ -146,6 +163,30 @@ cmake --build build -j
 冻结后重查、旧状态并发拒绝、解冻，以及活跃订单拒绝原因透传；看到
 `USER MANAGEMENT SMOKE TEST PASSED` 表示 Commit 5 客户端闭环通过。
 
+## Revenue statistics smoke test
+
+保持 mock server 运行，在另一终端执行：
+
+```bash
+./build/admin-revenue-smoke-test
+```
+
+测试覆盖汇总包含关系、金额/时间字段校验、7/30 个连续日期桶、缺失桶拒绝、汇总
+重复请求保护，以及 7/30 日乱序响应仍按各自 requestId 正确匹配；看到
+`REVENUE SMOKE TEST PASSED` 表示 Commit 6 客户端闭环通过。
+
+## Operations overview smoke test
+
+保持 mock server 运行，在另一终端执行：
+
+```bash
+./build/admin-operations-overview-smoke-test
+```
+
+测试会在同一轮首页刷新中并发请求营收汇总、7 日趋势、桩状态、站点和设备列表，
+再串行请求用户总数与活跃业务摘要；看到 `OPERATIONS OVERVIEW SMOKE TEST PASSED`
+表示首页所有数据来源均可完成协议解析。
+
 ## Structure
 
 ```text
@@ -155,12 +196,16 @@ src/model/ChargerStatusOverview  聚合响应 DTO 与一致性校验
 src/model/Charger                桩列表 DTO、字段校验和状态/类型显示映射
 src/model/Station                站点、详情、新增和版本化编辑请求的协议校验
 src/model/User                   用户分页、金额时间与冻结状态协议校验
+src/model/Revenue                营收汇总、日趋势与统计口径一致性校验
 src/session/AdminSession         管理员登录态唯一来源
 src/net/NetworkClient            TCP framing、超时和 requestId 匹配
 src/ui/LoginWindow               登录表单和交互状态
 src/ui/MainWindow                认证后的运营后台
+src/ui/OperationsOverviewPage    多接口聚合 KPI、7 日趋势与运营关注
 src/ui/ChargerManagementPage     列表、选择、二次确认和重启反馈
 src/ui/StationManagementPage     站点列表、详情、新增、编辑与站内设备运维
 src/ui/UserManagementPage        服务端搜索、分页和冻结/解冻风险控制
+src/ui/RevenueStatisticsPage     已结算 KPI、7/30 日切换和迟到响应保护
 src/ui/widgets/ChargerStatusOverviewWidget  状态卡片、进度条与刷新反馈
+src/ui/widgets/RevenueTrendChart            自适应浅色折线图和悬停金额
 ```

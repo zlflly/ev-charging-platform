@@ -4,6 +4,7 @@
 #include "model/Charger.h"
 #include "model/Station.h"
 #include "model/User.h"
+#include "model/Revenue.h"
 #include "net/NetworkClient.h"
 
 #include <QJsonObject>
@@ -50,6 +51,12 @@ public:
     using UserStatusUpdateCallback = std::function<void(
         std::optional<UserStatusUpdateResult> result,
         const QString& errorMessage)>;
+    using RevenueSummaryCallback = std::function<void(
+        std::optional<RevenueSummary> summary,
+        const QString& errorMessage)>;
+    using RevenueTrendCallback = std::function<void(
+        std::optional<RevenueTrend> trend,
+        const QString& errorMessage)>;
 
     explicit AdminApiClient(NetworkClient* network,
                             AdminSession* session,
@@ -82,6 +89,10 @@ public:
     bool updateUserStatus(const UserStatusUpdateRequest& request,
                           UserStatusUpdateCallback callback);
     bool isUserStatusUpdateInFlight() const;
+    bool requestRevenueSummary(RevenueSummaryCallback callback);
+    bool isRevenueSummaryInFlight() const;
+    bool requestRevenueTrend(int days, RevenueTrendCallback callback);
+    bool isRevenueTrendInFlight() const;
 
     QString sendAuthenticated(const QString& action,
                               const QJsonObject& data,
@@ -111,6 +122,8 @@ private:
     bool chargerStatusUpdateInFlight_ = false;
     bool userListInFlight_ = false;
     bool userStatusUpdateInFlight_ = false;
+    bool revenueSummaryInFlight_ = false;
+    int revenueTrendInFlightCount_ = 0;
     QString pendingAccount_;
     QString pendingPassword_;
 };

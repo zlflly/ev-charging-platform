@@ -10,10 +10,11 @@ class AdminSession;
 class QPushButton;
 class QStackedWidget;
 class QWidget;
-class ChargerStatusOverviewWidget;
 class ChargerManagementPage;
 class StationManagementPage;
 class UserManagementPage;
+class RevenueStatisticsPage;
+class OperationsOverviewPage;
 
 class MainWindow final : public QMainWindow
 {
@@ -31,18 +32,6 @@ signals:
 private:
     QWidget* createSidebar();
     QWidget* createTopbar();
-    QWidget* createOverviewPage();
-    QWidget* createRevenuePage();
-    QWidget* createMetricCard(const QString& label,
-                              const QString& value,
-                              const QString& hint,
-                              const QString& accent,
-                              QLabel** valueLabel = nullptr);
-    QWidget* createSectionCard(const QString& title, QWidget* content);
-    QWidget* createPlaceholderPanel(const QString& title,
-                                    const QString& message,
-                                    const QString& accent);
-
     void addNavigationButton(const QString& text, int pageIndex);
     void switchPage(int pageIndex);
     void connectToServer();
@@ -61,11 +50,11 @@ private:
     QLabel* connectionBadge_ = nullptr;
     QLabel* adminNameLabel_ = nullptr;
     QLabel* adminAccountLabel_ = nullptr;
-    QLabel* chargerTotalLabel_ = nullptr;
-    ChargerStatusOverviewWidget* chargerOverviewWidget_ = nullptr;
+    OperationsOverviewPage* operationsOverviewPage_ = nullptr;
     ChargerManagementPage* chargerManagementPage_ = nullptr;
     StationManagementPage* stationManagementPage_ = nullptr;
     UserManagementPage* userManagementPage_ = nullptr;
+    RevenueStatisticsPage* revenueStatisticsPage_ = nullptr;
     QPushButton* connectionButton_ = nullptr;
     QList<QPushButton*> navigationButtons_;
 };

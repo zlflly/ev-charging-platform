@@ -13,6 +13,7 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTimer>
+#include <QTimeZone>
 #include <QtEndian>
 
 #include <cstdio>
@@ -144,6 +145,27 @@ QJsonArray mockUsers()
         QJsonObject {{QStringLiteral("userId"), 5}, {QStringLiteral("phone"), QStringLiteral("18688886666")}, {QStringLiteral("nickname"), QStringLiteral("待结算用户")}, {QStringLiteral("balance"), 28.80}, {QStringLiteral("createdAt"), 1788470700000.0}, {QStringLiteral("status"), protocol::UserStatusNormal}, {QStringLiteral("activityStatus"), QStringLiteral("WAIT_SETTLEMENT")}, {QStringLiteral("activeOrder"), active(9005, 1, QStringLiteral("良乡大学城站"), 1002, QStringLiteral("CP-002"), QStringLiteral("WAIT_SETTLEMENT"))}},
         QJsonObject {{QStringLiteral("userId"), 6}, {QStringLiteral("phone"), QStringLiteral("15100001234")}, {QStringLiteral("nickname"), QStringLiteral("测试用户")}, {QStringLiteral("balance"), 9.90}, {QStringLiteral("createdAt"), 1788480900000.0}, {QStringLiteral("status"), protocol::UserStatusNormal}, {QStringLiteral("activityStatus"), QStringLiteral("IDLE")}, {QStringLiteral("activeOrder"), idle()}},
     };
+}
+
+double mockRevenueForDate(const QDate& date)
+{
+    if (date.dayOfYear() % 6 == 0) return 0.0;
+    return 40.5 + static_cast<double>((date.dayOfYear() * 37) % 190);
+}
+
+QJsonArray mockRevenuePoints(int days)
+{
+    const QDate endDate = QDateTime::currentDateTimeUtc().toTimeZone(
+        QTimeZone(QByteArrayLiteral("Asia/Shanghai"))).date();
+    QJsonArray points;
+    for (int offset = days - 1; offset >= 0; --offset) {
+        const QDate date = endDate.addDays(-offset);
+        points.append(QJsonObject {
+            {QStringLiteral("date"), date.toString(QStringLiteral("yyyy-MM-dd"))},
+            {QStringLiteral("revenue"), mockRevenueForDate(date)},
+        });
+    }
+    return points;
 }
 
 class MockServer final : public QObject
@@ -441,6 +463,56 @@ private:
                             {QStringLiteral("changedAt"), static_cast<double>(QDateTime::currentMSecsSinceEpoch())},
                         });
                     }
+                }
+            }
+        } else if (action == QString::fromUtf8(
+                       protocol::action::kAdminRevenueSummary)) {
+            if (adminIds_.value(socket) <= 0) {
+                response.insert(QStringLiteral("code"), protocol::CodeNotLoggedIn);
+                response.insert(QStringLiteral("message"),
+                                QStringLiteral("administrator login required"));
+            } else if (!requestData.isEmpty()) {
+                response.insert(QStringLiteral("code"), protocol::CodeBadRequest);
+                response.insert(QStringLiteral("message"),
+                                QStringLiteral("revenue summary data must be empty"));
+            } else {
+                const QDate today = QDateTime::currentDateTimeUtc().toTimeZone(
+                    QTimeZone(QByteArrayLiteral("Asia/Shanghai"))).date();
+                response.insert(QStringLiteral("data"), QJsonObject {
+                    {QStringLiteral("todayRevenue"), mockRevenueForDate(today)},
+                    {QStringLiteral("monthRevenue"), 3680.75},
+                    {QStringLiteral("totalRevenue"), 15280.25},
+                    {QStringLiteral("currency"), QStringLiteral("CNY")},
+                    {QStringLiteral("timezone"), QStringLiteral("Asia/Shanghai")},
+                    {QStringLiteral("generatedAt"),
+                     QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
+                });
+            }
+        } else if (action == QString::fromUtf8(
+                       protocol::action::kAdminRevenueTrend)) {
+            if (adminIds_.value(socket) <= 0) {
+                response.insert(QStringLiteral("code"), protocol::CodeNotLoggedIn);
+                response.insert(QStringLiteral("message"),
+                                QStringLiteral("administrator login required"));
+            } else {
+                const QJsonValue daysValue = requestData.value(QStringLiteral("days"));
+                const double daysNumber = daysValue.toDouble(-1.0);
+                const bool valid = requestData.size() == 1 && daysValue.isDouble()
+                    && std::floor(daysNumber) == daysNumber
+                    && (daysNumber == 7.0 || daysNumber == 30.0);
+                if (!valid) {
+                    response.insert(QStringLiteral("code"), protocol::CodeBadRequest);
+                    response.insert(QStringLiteral("message"),
+                                    QStringLiteral("days must be 7 or 30"));
+                } else {
+                    const int days = static_cast<int>(daysNumber);
+                    response.insert(QStringLiteral("data"), QJsonObject {
+                        {QStringLiteral("days"), days},
+                        {QStringLiteral("timezone"), QStringLiteral("Asia/Shanghai")},
+                        {QStringLiteral("generatedAt"),
+                         QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
+                        {QStringLiteral("points"), mockRevenuePoints(days)},
+                    });
                 }
             }
         } else if (action == QString::fromUtf8(
@@ -890,7 +962,11 @@ private:
         // 反向延迟 PING，强制客户端在乱序响应下按 requestId 匹配。
         const QString echo = requestData.value(QStringLiteral("echo")).toString();
         const int suffix = echo.right(1).toInt();
-        const int delayMs = echo.isEmpty() ? 0 : (5 - suffix) * 25;
+        int delayMs = echo.isEmpty() ? 0 : (5 - suffix) * 25;
+        // 7 日请求故意慢于 30 日请求，用于验证页面 generation 防止迟到覆盖。
+        if (action == QString::fromUtf8(protocol::action::kAdminRevenueTrend)) {
+            delayMs = requestData.value(QStringLiteral("days")).toInt() == 7 ? 180 : 20;
+        }
         const QPointer<QTcpSocket> guardedSocket(socket);
         QTimer::singleShot(delayMs, this, [guardedSocket, response] {
             if (guardedSocket) {

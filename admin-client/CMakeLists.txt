@@ -14,17 +14,21 @@ qt_add_executable(admin-client
     src/api/AdminApiClient.cpp
     src/model/Charger.cpp
     src/model/ChargerStatusOverview.cpp
+    src/model/Revenue.cpp
     src/model/Station.cpp
     src/model/User.cpp
     src/net/NetworkClient.cpp
     src/session/AdminSession.cpp
     src/ui/LoginWindow.cpp
+    src/ui/OperationsOverviewPage.cpp
     src/ui/ChargerManagementPage.cpp
     src/ui/StationManagementPage.cpp
     src/ui/UserManagementPage.cpp
+    src/ui/RevenueStatisticsPage.cpp
     src/ui/MainWindow.cpp
     src/ui/widgets/ChargerStatusOverviewWidget.cpp
     src/ui/widgets/EntityTableView.cpp
+    src/ui/widgets/RevenueTrendChart.cpp
     src/ui/theme/Theme.h
 )
 
@@ -67,6 +71,7 @@ qt_add_executable(admin-charger-overview-smoke-test
     src/api/AdminApiClient.cpp
     src/model/Charger.cpp
     src/model/ChargerStatusOverview.cpp
+    src/model/Revenue.cpp
     src/model/Station.cpp
     src/model/User.cpp
     src/net/NetworkClient.cpp
@@ -80,6 +85,7 @@ qt_add_executable(admin-charger-management-smoke-test
     src/api/AdminApiClient.cpp
     src/model/Charger.cpp
     src/model/ChargerStatusOverview.cpp
+    src/model/Revenue.cpp
     src/model/Station.cpp
     src/model/User.cpp
     src/net/NetworkClient.cpp
@@ -93,6 +99,7 @@ qt_add_executable(admin-station-management-smoke-test
     src/api/AdminApiClient.cpp
     src/model/Charger.cpp
     src/model/ChargerStatusOverview.cpp
+    src/model/Revenue.cpp
     src/model/Station.cpp
     src/model/User.cpp
     src/net/NetworkClient.cpp
@@ -106,6 +113,7 @@ qt_add_executable(admin-station-operations-smoke-test
     src/api/AdminApiClient.cpp
     src/model/Charger.cpp
     src/model/ChargerStatusOverview.cpp
+    src/model/Revenue.cpp
     src/model/Station.cpp
     src/model/User.cpp
     src/net/NetworkClient.cpp
@@ -119,6 +127,7 @@ qt_add_executable(admin-user-management-smoke-test
     src/api/AdminApiClient.cpp
     src/model/Charger.cpp
     src/model/ChargerStatusOverview.cpp
+    src/model/Revenue.cpp
     src/model/Station.cpp
     src/model/User.cpp
     src/net/NetworkClient.cpp
@@ -126,3 +135,31 @@ qt_add_executable(admin-user-management-smoke-test
 )
 target_include_directories(admin-user-management-smoke-test PRIVATE src)
 target_link_libraries(admin-user-management-smoke-test PRIVATE Qt6::Core Qt6::Network)
+
+qt_add_executable(admin-revenue-smoke-test
+    tests/AdminRevenueSmokeTest.cpp
+    src/api/AdminApiClient.cpp
+    src/model/Charger.cpp
+    src/model/ChargerStatusOverview.cpp
+    src/model/Revenue.cpp
+    src/model/Station.cpp
+    src/model/User.cpp
+    src/net/NetworkClient.cpp
+    src/session/AdminSession.cpp
+)
+target_include_directories(admin-revenue-smoke-test PRIVATE src)
+target_link_libraries(admin-revenue-smoke-test PRIVATE Qt6::Core Qt6::Network)
+
+qt_add_executable(admin-operations-overview-smoke-test
+    tests/AdminOperationsOverviewSmokeTest.cpp
+    src/api/AdminApiClient.cpp
+    src/model/Charger.cpp
+    src/model/ChargerStatusOverview.cpp
+    src/model/Revenue.cpp
+    src/model/Station.cpp
+    src/model/User.cpp
+    src/net/NetworkClient.cpp
+    src/session/AdminSession.cpp
+)
+target_include_directories(admin-operations-overview-smoke-test PRIVATE src)
+target_link_libraries(admin-operations-overview-smoke-test PRIVATE Qt6::Core Qt6::Network)

@@ -21,6 +21,8 @@ inline constexpr const char* kAdminStationCreate = "admin.stations.create";
 inline constexpr const char* kAdminStationUpdate = "admin.stations.update";
 inline constexpr const char* kAdminUserList = "admin.users.list";
 inline constexpr const char* kAdminUserFreeze = "admin.users.freeze";
+inline constexpr const char* kAdminRevenueSummary = "admin.revenue.summary";
+inline constexpr const char* kAdminRevenueTrend = "admin.revenue.trend";
 inline constexpr const char* kStationDetail = "station.detail";
 } // namespace action
 
