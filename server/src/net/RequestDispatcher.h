@@ -18,6 +18,7 @@
 #include "service/StationService.h"
 #include "service/OrderService.h"
 #include "service/AdminService.h"
+#include "service/MLService.h"
 
 namespace net {
 
@@ -33,6 +34,7 @@ public:
         , m_stationService(new service::StationService(this))
         , m_orderService(new service::OrderService(this))
         , m_adminService(new service::AdminService(this))
+        , m_mlService(new service::MLService(this))
     {
         // 公共接口
         registerHandler(protocol::action::kPing, &RequestDispatcher::handlePing);
@@ -69,6 +71,9 @@ public:
         registerHandler(protocol::action::kAdminRevenueSummary, &RequestDispatcher::handleAdminRevenueSummary);
         registerHandler(protocol::action::kAdminRevenueTrend, &RequestDispatcher::handleAdminRevenueTrend);
         registerHandler(protocol::action::kAdminOrdersList, &RequestDispatcher::handleAdminOrdersList);
+
+        // 机器学习数据接口（Commit 7）
+        registerHandler(protocol::action::kMLOrdersExport, &RequestDispatcher::handleMLOrdersExport);
     }
 
     void dispatch(const protocol::Request& request, TcpConnection* connection)
@@ -129,6 +134,11 @@ private:
         // admin.* 需要管理员登录（后续 Commit 6 补充细粒度检查）
         if (action.startsWith("admin.")) {
             return true;
+        }
+
+        // ml.* 不需要登录（供成员4访问）
+        if (action.startsWith("ml.")) {
+            return false;
         }
 
         // station.* 不需要登录（公开查询）
@@ -307,12 +317,21 @@ private:
         connection->sendResponse(protocol::buildResponse(request.requestId, response));
     }
 
+    // Commit 7: 机器学习数据接口
+
+    void handleMLOrdersExport(const protocol::Request& request, TcpConnection* connection)
+    {
+        QJsonObject response = m_mlService->handleOrdersExport(request.data, connection->socket());
+        connection->sendResponse(protocol::buildResponse(request.requestId, response));
+    }
+
 private:
     QHash<QString, Handler> m_handlers;
     service::UserService* m_userService;
     service::StationService* m_stationService;
     service::OrderService* m_orderService;
     service::AdminService* m_adminService;
+    service::MLService* m_mlService;
 };
 
 } // namespace net

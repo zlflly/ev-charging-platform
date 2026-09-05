@@ -64,8 +64,8 @@ inline constexpr const char* kAdminOrdersList    = "admin.orders.list";
 inline constexpr const char* kAdminChargersStats = "admin.chargers.stats";
 
 // 机器学习端（Commit 7 补齐）
-inline constexpr const char* kMlOrdersExport = "ml.orders.export";
-inline constexpr const char* kMlForecastGet  = "ml.forecast.get";
+inline constexpr const char* kMLOrdersExport = "ml.orders.export";
+inline constexpr const char* kMLForecastGet  = "ml.forecast.get";
 } // namespace action
 
 // ----------------------------------------------------------------------------
